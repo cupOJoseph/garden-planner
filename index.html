@@ -190,7 +190,7 @@
     <div class="flex items-center justify-between mb-4">
       <div>
         <h3 class="font-semibold text-gray-700">⭐ My Planting Schedule</h3>
-        <p class="text-xs text-gray-400 mt-1">Star crops in the Planting Calendar, then mark each as indoor or outdoor. Indoor crops skip transplant tasks.</p>
+        <p class="text-xs text-gray-400 mt-1">Star crops in the Planting Calendar to add them here. Plant them in beds or pots to set indoor/outdoor.</p>
       </div>
       <div class="flex gap-2">
         <button onclick="exportSchedule()" class="text-xs px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition">📋 Copy to Clipboard</button>
@@ -398,19 +398,17 @@ let beds = JSON.parse(localStorage.getItem('garden_beds') || 'null') || [
 let pots = JSON.parse(localStorage.getItem('garden_pots') || '[]');
 let indoorPlants = JSON.parse(localStorage.getItem('indoor_plants') || '[]');
 let favorites = JSON.parse(localStorage.getItem('garden_favorites') || '[]');
-// Migrate old string favorites to objects: {name, setting: 'outdoor'|'indoor'}
-if (favorites.length && typeof favorites[0] === 'string') {
-  favorites = favorites.map(f => ({ name: f, setting: 'outdoor' }));
+// Migrate: if favorites are objects from old version, flatten to strings
+if (favorites.length && typeof favorites[0] === 'object') {
+  favorites = [...new Set(favorites.map(f => f.name))];
   localStorage.setItem('garden_favorites', JSON.stringify(favorites));
 }
-let savedTasks = JSON.parse(localStorage.getItem('garden_tasks') || '[]');
 
 function save() {
   localStorage.setItem('garden_beds', JSON.stringify(beds));
   localStorage.setItem('garden_pots', JSON.stringify(pots));
   localStorage.setItem('indoor_plants', JSON.stringify(indoorPlants));
   localStorage.setItem('garden_favorites', JSON.stringify(favorites));
-  localStorage.setItem('garden_tasks', JSON.stringify(savedTasks));
 }
 
 // ===== TABS =====
@@ -469,12 +467,12 @@ function clickCell(bi, ci) {
   const key = `${ci}`;
   if (beds[bi].cells[key]) { delete beds[bi].cells[key]; }
   else { beds[bi].cells[key] = selectedPlant.name; }
-  save(); renderBeds();
+  save(); renderBeds(); renderSchedule();
 }
 
 function removeCell(bi, ci) {
   delete beds[bi].cells[`${ci}`];
-  save(); renderBeds();
+  save(); renderBeds(); renderSchedule();
 }
 
 function resizeBed(bi) {
@@ -483,7 +481,7 @@ function resizeBed(bi) {
   if (cols && rows) {
     beds[bi].cols = Math.min(Math.max(parseInt(cols), 2), 16);
     beds[bi].rows = Math.min(Math.max(parseInt(rows), 2), 12);
-    save(); renderBeds();
+    save(); renderBeds(); renderSchedule();
   }
 }
 
@@ -531,18 +529,18 @@ function renderPots() {
 
 function addPot(location) {
   pots.push({ plant: null, location: location || 'outdoor' });
-  save(); renderPots();
+  save(); renderPots(); renderSchedule();
 }
 
 function clickPot(i) {
   if (!selectedPlant) { alert("Select a plant from the palette first!"); return; }
   pots[i].plant = pots[i].plant === selectedPlant.name ? null : selectedPlant.name;
-  save(); renderPots();
+  save(); renderPots(); renderSchedule();
 }
 
 function removePot(i) {
   pots.splice(i, 1);
-  save(); renderPots();
+  save(); renderPots(); renderSchedule();
 }
 
 // ===== ALMANAC =====
@@ -571,23 +569,18 @@ function renderAlmanac() {
   </div>`;
 
   html += filtered.map(plant => {
-    const isFav = favorites.some(f => f.name === plant.name);
+    const isFav = favorites.includes(plant.name);
     const bars = MONTHS.map((_, mi) => {
       const m = mi + 1;
       let cls = '';
-      let action = '';
-      if (plant.indoors?.includes(m)) { cls = 'sow-indoor'; action = 'indoors'; }
-      else if (plant.transplant?.includes(m)) { cls = 'transplant'; action = 'transplant'; }
-      else if (plant.sow?.includes(m)) { cls = 'sow-outdoor'; action = 'sow'; }
-      else if (plant.harvest?.includes(m)) { cls = 'harvest'; action = 'harvest'; }
-      const isSelected = action && savedTasks.some(t => t.startsWith(`${plant.name}|${action}|${m}`));
-      const ring = isSelected ? 'outline outline-2 outline-offset-1 outline-yellow-400' : '';
-      const clickHandler = action ? `onclick="toggleTask('${plant.name}','${action}',${m})"` : '';
-      const cursor = action ? 'cursor-pointer hover:opacity-80' : '';
-      return `<div class="flex-1 px-0.5"><div class="month-bar ${cls} ${ring} ${cursor}" ${clickHandler} style="height:20px; ${cls ? '' : 'background:transparent;'}" title="${action ? (isSelected ? 'Remove from schedule' : 'Click to add to schedule') : ''}"></div></div>`;
+      if (plant.indoors?.includes(m)) cls = 'sow-indoor';
+      else if (plant.transplant?.includes(m)) cls = 'transplant';
+      else if (plant.sow?.includes(m)) cls = 'sow-outdoor';
+      else if (plant.harvest?.includes(m)) cls = 'harvest';
+      return `<div class="flex-1 px-0.5"><div class="month-bar ${cls}" style="height:20px; ${cls ? '' : 'background:transparent;'}"></div></div>`;
     }).join('');
     return `<div class="flex items-center gap-0 py-1 hover:bg-gray-50 rounded">
-      <button onclick="toggleAllFavorite('${plant.name}')" class="w-8 shrink-0 text-center text-sm hover:scale-125 transition-transform" title="${isFav ? 'Remove from schedule' : 'Add to schedule (outdoor)'}">${isFav ? '⭐' : '☆'}</button>
+      <button onclick="toggleFavorite('${plant.name}')" class="w-8 shrink-0 text-center text-sm hover:scale-125 transition-transform" title="${isFav ? 'Remove from schedule' : 'Add to schedule'}">${isFav ? '⭐' : '☆'}</button>
       <div class="w-32 shrink-0 text-sm">${plant.emoji} ${plant.name}</div>
       ${bars}
     </div>`;
@@ -601,98 +594,10 @@ function renderAlmanac() {
   }
 }
 
-// ===== SCHEDULE (TASK-BASED) =====
-const ACTION_META = {
-  indoors:    { label: 'Start Indoors', cls: 'sow-indoor', icon: '🏠' },
-  sow:        { label: 'Direct Sow',    cls: 'sow-outdoor', icon: '🌱' },
-  transplant: { label: 'Transplant',     cls: 'transplant',  icon: '🪴' },
-  harvest:    { label: 'Harvest',        cls: 'harvest',     icon: '🧺' },
-};
-
-function toggleTask(name, action, month) {
-  // Find which settings this crop has, default to outdoor
-  const settings = favorites.filter(f => f.name === name).map(f => f.setting);
-  const setting = settings[0] || 'outdoor';
-  
-  const key = `${name}|${action}|${month}|${setting}`;
-  const idx = savedTasks.indexOf(key);
-  if (idx >= 0) savedTasks.splice(idx, 1);
-  else {
-    savedTasks.push(key);
-    if (!favorites.some(f => f.name === name)) favorites.push({ name, setting: 'outdoor' });
-  }
-  // Remove favorite entry if no tasks left for that setting
-  favorites.forEach((fav, i) => {
-    if (fav.name === name && !savedTasks.some(t => t.startsWith(name + '|') && t.endsWith('|' + fav.setting))) {
-      favorites.splice(i, 1);
-    }
-  });
-  save(); renderAlmanac(); renderSchedule();
-}
-
-function toggleAllFavorite(name) {
-  // If any entries exist, remove all. Otherwise add as outdoor.
-  const existing = favorites.filter(f => f.name === name);
-  if (existing.length) {
-    savedTasks = savedTasks.filter(t => !t.startsWith(name + '|outdoor|') && !t.startsWith(name + '|indoor|'));
-    // Also clean old format tasks
-    savedTasks = savedTasks.filter(t => { const parts = t.split('|'); return parts[0] !== name || (parts.length === 4); });
-    favorites = favorites.filter(f => f.name !== name);
-  } else {
-    addCropAs(name, 'outdoor');
-  }
-  save(); renderAlmanac(); renderSchedule();
-}
-
-function addCropAs(name, setting) {
-  const plant = ALMANAC.find(p => p.name === name);
-  if (!plant) return;
-  if (favorites.some(f => f.name === name && f.setting === setting)) return; // already exists
-  favorites.push({ name, setting });
-  // Add tasks with setting prefix: "name|action|month|setting"
-  const actions = [];
-  if (setting === 'indoor') {
-    // Indoor: start indoors + sow + harvest (skip transplant)
-    (plant.indoors || []).forEach(m => actions.push(`${name}|indoors|${m}|${setting}`));
-    (plant.sow || []).forEach(m => actions.push(`${name}|sow|${m}|${setting}`));
-    (plant.harvest || []).forEach(m => actions.push(`${name}|harvest|${m}|${setting}`));
-  } else {
-    // Outdoor: all actions
-    (plant.indoors || []).forEach(m => actions.push(`${name}|indoors|${m}|${setting}`));
-    (plant.sow || []).forEach(m => actions.push(`${name}|sow|${m}|${setting}`));
-    (plant.transplant || []).forEach(m => actions.push(`${name}|transplant|${m}|${setting}`));
-    (plant.harvest || []).forEach(m => actions.push(`${name}|harvest|${m}|${setting}`));
-  }
-  actions.forEach(k => { if (!savedTasks.includes(k)) savedTasks.push(k); });
-  save();
-}
-
-function addCropSetting(name) {
-  const existing = favorites.filter(f => f.name === name);
-  const hasOutdoor = existing.some(f => f.setting === 'outdoor');
-  const hasIndoor = existing.some(f => f.setting === 'indoor');
-  
-  if (!hasOutdoor && !hasIndoor) {
-    addCropAs(name, 'outdoor');
-  } else if (hasOutdoor && !hasIndoor) {
-    addCropAs(name, 'indoor');
-  } else if (!hasOutdoor && hasIndoor) {
-    addCropAs(name, 'outdoor');
-  }
-  // If both exist already, do nothing (they can remove individually)
-  save(); renderAlmanac(); renderSchedule();
-}
-
-function removeCropEntry(name, setting) {
-  savedTasks = savedTasks.filter(t => {
-    const parts = t.split('|');
-    if (parts[0] !== name) return true;
-    // Handle both old format (3 parts) and new format (4 parts)
-    if (parts.length === 4) return parts[3] !== setting;
-    // Old format: remove if this is the only entry
-    return false;
-  });
-  favorites = favorites.filter(f => !(f.name === name && f.setting === setting));
+function toggleFavorite(name) {
+  const idx = favorites.indexOf(name);
+  if (idx >= 0) favorites.splice(idx, 1);
+  else favorites.push(name);
   save(); renderAlmanac(); renderSchedule();
 }
 
@@ -705,56 +610,83 @@ function renderSchedule() {
   if (!favorites.length) {
     cropsEl.innerHTML = '';
     timeline.innerHTML = '';
-    nowEl.innerHTML = '<p class="text-sm text-green-700">Click colored bars on the 📅 Planting Calendar to pick specific planting windows, or click ⭐ to add all windows for a crop.</p>';
+    nowEl.innerHTML = '<p class="text-sm text-green-700">Star ⭐ crops on the 📅 Planting Calendar to build your schedule.</p>';
     emptyEl.classList.remove('hidden');
     return;
   }
   emptyEl.classList.add('hidden');
 
-  // Group favorites by plant name
-  const cropNames = [...new Set(favorites.map(f => f.name))];
+  const favPlants = ALMANAC.filter(p => favorites.includes(p.name));
+
+  // Determine indoor/outdoor per plant based on where they're planted (pots + beds)
+  const plantLocations = {}; // name → Set of 'indoor'|'outdoor'
+  favorites.forEach(name => plantLocations[name] = new Set());
   
+  // Check beds (always outdoor)
+  beds.forEach(bed => {
+    Object.values(bed.cells).forEach(plantName => {
+      if (plantLocations[plantName]) plantLocations[plantName].add('outdoor');
+    });
+  });
+  // Check pots
+  pots.forEach(pot => {
+    if (pot.plant && plantLocations[pot.plant]) {
+      plantLocations[pot.plant].add(pot.location === 'indoor' ? 'indoor' : 'outdoor');
+    }
+  });
+
+  // Crop pills showing where they're planted
   cropsEl.innerHTML = `
-    <div class="flex flex-wrap gap-2 mb-2">
-      ${cropNames.map(name => {
+    <div class="flex flex-wrap gap-2 mb-3">
+      ${favorites.map(name => {
         const plant = ALMANAC.find(p => p.name === name);
         const emoji = plant ? plant.emoji : '🌱';
-        const entries = favorites.filter(f => f.name === name);
-        const hasOutdoor = entries.some(e => e.setting === 'outdoor');
-        const hasIndoor = entries.some(e => e.setting === 'indoor');
-        const hasBoth = hasOutdoor && hasIndoor;
-        
-        return `<div class="inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-full text-xs border bg-gray-50 border-gray-200">
-          <span>${emoji} ${name}</span>
-          ${hasOutdoor ? `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-200 text-green-800" title="Destined for outdoor beds">🌤️ Bed<button onclick="removeCropEntry('${name}','outdoor')" class="hover:text-red-600 ml-0.5">✕</button></span>` : ''}
-          ${hasIndoor ? `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-purple-200 text-purple-800" title="Stays indoors permanently">🏠 Stays in<button onclick="removeCropEntry('${name}','indoor')" class="hover:text-red-600 ml-0.5">✕</button></span>` : ''}
-          ${!hasBoth ? `<button onclick="addCropSetting('${name}')" class="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-200 text-gray-600 hover:bg-gray-300" title="Also grow ${hasOutdoor ? 'indoors (stays in pot)' : 'outdoors (transplant to bed)'}">+ ${hasOutdoor ? '🏠' : '🌤️'}</button>` : ''}
-        </div>`;
+        const locs = plantLocations[name];
+        const hasOutdoor = locs.has('outdoor');
+        const hasIndoor = locs.has('indoor');
+        const locBadge = hasOutdoor && hasIndoor ? '🌤️+🏠'
+          : hasOutdoor ? '🌤️ Bed'
+          : hasIndoor ? '🏠 Indoor'
+          : '⚪ Not planted';
+        const locClass = hasIndoor && !hasOutdoor ? 'bg-purple-50 border-purple-200'
+          : hasOutdoor ? 'bg-green-50 border-green-200'
+          : 'bg-gray-50 border-gray-200';
+        return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${locClass}">
+          ${emoji} ${name} <span class="text-[10px] opacity-70">${locBadge}</span>
+          <button onclick="toggleFavorite('${name}')" class="text-gray-400 hover:text-red-500 ml-0.5">✕</button>
+        </span>`;
       }).join('')}
     </div>
-    <p class="text-[10px] text-gray-400">🏠 = stays indoors (skips transplant) · 🌤️ = destined for outdoor beds (full cycle incl. transplant). Same crop can have both!</p>
+    <p class="text-[10px] text-gray-400 mb-1">Location is based on where you've planted: beds = outdoor, pots = indoor or outdoor. Indoor plants skip transplant.</p>
   `;
 
   const currentMonth = new Date().getMonth() + 1;
 
-  // Parse tasks into monthly schedule, filtering by indoor/outdoor setting
+  // Build tasks per month
   const schedule = {};
   for (let m = 1; m <= 12; m++) schedule[m] = [];
 
-  savedTasks.forEach(taskKey => {
-    const parts = taskKey.split('|');
-    const name = parts[0], action = parts[1], monthStr = parts[2];
-    const setting = parts[3] || 'outdoor'; // backward compat
-    const m = parseInt(monthStr);
-    const plant = ALMANAC.find(p => p.name === name);
-    const meta = ACTION_META[action];
-    if (!plant || !meta) return;
-    const isIndoor = setting === 'indoor';
-    // Relabel for indoor-destination plants
-    let label = meta.label;
-    if (isIndoor && action === 'indoors') label = 'Sow (stays indoor)';
-    if (isIndoor && action === 'sow') label = 'Sow (stays indoor)';
-    schedule[m].push({ plant, action: label, cls: meta.cls, icon: meta.icon, key: taskKey, isIndoor });
+  favPlants.forEach(plant => {
+    const locs = plantLocations[plant.name];
+    const isIndoorOnly = locs.has('indoor') && !locs.has('outdoor');
+    
+    (plant.indoors || []).forEach(m => schedule[m].push({
+      plant, action: isIndoorOnly ? 'Sow (indoor)' : 'Start Indoors',
+      cls: 'sow-indoor', icon: '🏠', isIndoor: isIndoorOnly
+    }));
+    (plant.sow || []).forEach(m => schedule[m].push({
+      plant, action: isIndoorOnly ? 'Sow (indoor)' : 'Direct Sow',
+      cls: 'sow-outdoor', icon: '🌱', isIndoor: isIndoorOnly
+    }));
+    // Skip transplant for indoor-only plants
+    if (!isIndoorOnly) {
+      (plant.transplant || []).forEach(m => schedule[m].push({
+        plant, action: 'Transplant', cls: 'transplant', icon: '🪴', isIndoor: false
+      }));
+    }
+    (plant.harvest || []).forEach(m => schedule[m].push({
+      plant, action: 'Harvest', cls: 'harvest', icon: '🧺', isIndoor: isIndoorOnly
+    }));
   });
 
   // Current month summary
@@ -770,7 +702,7 @@ function renderSchedule() {
     nowEl.innerHTML = `<p class="text-sm text-green-700">📍 ${MONTHS[currentMonth - 1]} — Nothing scheduled this month. Relax! 🌿</p>`;
   }
 
-  // Full 12-month timeline with remove buttons
+  // Full 12-month timeline
   timeline.innerHTML = Array.from({length: 12}, (_, i) => {
     const m = i + 1;
     const tasks = schedule[m];
@@ -791,11 +723,10 @@ function renderSchedule() {
         <div class="w-10 text-xs font-semibold ${isCurrent ? 'text-green-700' : 'text-gray-600'} pt-1">${MONTHS[i]}${isCurrent ? ' ◀' : ''}</div>
         <div class="flex-1 border-l-2 ${isCurrent ? 'border-green-400' : 'border-gray-200'} pl-4 py-1 space-y-1">
           ${tasks.map(t => `
-            <div class="flex items-center gap-2 text-sm group">
+            <div class="flex items-center gap-2 text-sm">
               <span class="month-bar ${t.cls} inline-block px-2 py-0.5 rounded text-xs">${t.icon} ${t.action}</span>
               <span>${t.plant.emoji} ${t.plant.name}</span>
               <span class="text-[10px] px-1.5 py-0.5 rounded ${t.isIndoor ? 'bg-purple-100 text-purple-600' : 'bg-green-100 text-green-600'}">${t.isIndoor ? '🏠' : '🌤️'}</span>
-              <button onclick="removeTask('${t.key}')" class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 text-xs transition-opacity" title="Remove">✕</button>
             </div>
           `).join('')}
         </div>
@@ -804,34 +735,19 @@ function renderSchedule() {
   }).join('');
 }
 
-function removeTask(key) {
-  savedTasks = savedTasks.filter(t => t !== key);
-  const parts = key.split('|');
-  const name = parts[0];
-  const setting = parts[3] || 'outdoor';
-  // Remove favorite entry if no tasks left for that setting
-  if (!savedTasks.some(t => t.startsWith(name + '|') && (t.endsWith('|' + setting) || (parts.length === 3 && t.split('|').length === 3)))) {
-    favorites = favorites.filter(f => !(f.name === name && f.setting === setting));
-  }
-  save(); renderAlmanac(); renderSchedule();
-}
-
 function exportSchedule() {
-  if (!savedTasks.length) { alert('Add some planting windows first!'); return; }
+  if (!favorites.length) { alert('Star some crops first!'); return; }
+  const favPlants = ALMANAC.filter(p => favorites.includes(p.name));
   let text = '🌱 NOVA Garden Planting Schedule (Zone 7a)\n\n';
   
   for (let m = 1; m <= 12; m++) {
-    const tasks = savedTasks
-      .filter(t => parseInt(t.split('|')[2]) === m)
-      .map(t => {
-        const parts = t.split('|');
-        const name = parts[0], action = parts[1], setting = parts[3] || 'outdoor';
-        const plant = ALMANAC.find(p => p.name === name);
-        const meta = ACTION_META[action];
-        const loc = setting === 'indoor' ? ' (indoor)' : '';
-        return plant && meta ? `${meta.icon} ${meta.label}: ${plant.name}${loc}` : null;
-      })
-      .filter(Boolean);
+    const tasks = [];
+    favPlants.forEach(plant => {
+      if (plant.indoors?.includes(m)) tasks.push(`🏠 Start Indoors: ${plant.name}`);
+      if (plant.sow?.includes(m)) tasks.push(`🌱 Direct Sow: ${plant.name}`);
+      if (plant.transplant?.includes(m)) tasks.push(`🪴 Transplant: ${plant.name}`);
+      if (plant.harvest?.includes(m)) tasks.push(`🧺 Harvest: ${plant.name}`);
+    });
     if (tasks.length) {
       text += `${MONTHS[m-1]}:\n${tasks.map(t => `  ${t}`).join('\n')}\n\n`;
     }
