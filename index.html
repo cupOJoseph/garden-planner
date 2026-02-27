@@ -231,38 +231,44 @@ const PLANTS = [
   { name: "Blueberry", emoji: "🫐", type: "flower", companion: ["Strawberry"], avoid: [] },
 ];
 
-// Zone 7a almanac data (month ranges, 1-indexed)
+// Zone 7a almanac — Falls Church, VA (ZIP 22046)
+// Source: Old Farmer's Almanac 2026 (almanac.com/gardening/planting-calendar/zipcode/22046)
+// Last spring frost: Apr 16 · First fall frost: Oct 25
+// Verified Feb 27, 2026
 const ALMANAC = [
-  { name: "Tomato", emoji: "🍅", type: "vegetable", indoors: [2,3], sow: [5,6], transplant: [4,5], harvest: [7,8,9,10] },
-  { name: "Pepper", emoji: "🌶️", type: "vegetable", indoors: [2,3], sow: [], transplant: [5,6], harvest: [7,8,9,10] },
-  { name: "Lettuce", emoji: "🥬", type: "vegetable", indoors: [2], sow: [3,4,8,9], transplant: [3,4], harvest: [4,5,6,10,11] },
-  { name: "Carrot", emoji: "🥕", type: "vegetable", indoors: [], sow: [3,4,7,8], transplant: [], harvest: [6,7,10,11] },
-  { name: "Cucumber", emoji: "🥒", type: "vegetable", indoors: [3,4], sow: [5,6], transplant: [5], harvest: [6,7,8,9] },
-  { name: "Zucchini", emoji: "🫒", type: "vegetable", indoors: [4], sow: [5,6], transplant: [5], harvest: [6,7,8,9] },
-  { name: "Bean", emoji: "🫘", type: "vegetable", indoors: [], sow: [4,5,6,7], transplant: [], harvest: [6,7,8,9] },
-  { name: "Corn", emoji: "🌽", type: "vegetable", indoors: [], sow: [4,5], transplant: [], harvest: [7,8,9] },
-  { name: "Pea", emoji: "🟢", type: "vegetable", indoors: [], sow: [2,3,8,9], transplant: [], harvest: [5,6,10,11] },
-  { name: "Radish", emoji: "🔴", type: "vegetable", indoors: [], sow: [3,4,8,9], transplant: [], harvest: [4,5,9,10] },
-  { name: "Spinach", emoji: "🥗", type: "vegetable", indoors: [], sow: [2,3,9,10], transplant: [], harvest: [4,5,10,11] },
-  { name: "Kale", emoji: "🥦", type: "vegetable", indoors: [2,3], sow: [3,4,8,9], transplant: [4], harvest: [5,6,10,11,12] },
-  { name: "Onion", emoji: "🧅", type: "vegetable", indoors: [1,2], sow: [3,4], transplant: [3,4], harvest: [6,7,8] },
-  { name: "Garlic", emoji: "🧄", type: "vegetable", indoors: [], sow: [10,11], transplant: [], harvest: [6,7] },
+  // VEGETABLES — verified against Almanac 22046 data
+  { name: "Tomato", emoji: "🍅", type: "vegetable", indoors: [2,3], sow: [], transplant: [5], harvest: [7,8,9,10] },
+  { name: "Pepper", emoji: "🌶️", type: "vegetable", indoors: [2], sow: [], transplant: [5], harvest: [7,8,9,10] },
+  { name: "Lettuce", emoji: "🥬", type: "vegetable", indoors: [2,3], sow: [3,4,9], transplant: [3], harvest: [5,6,10,11] },
+  { name: "Carrot", emoji: "🥕", type: "vegetable", indoors: [], sow: [3,4,8], transplant: [], harvest: [6,7,10,11] },
+  { name: "Cucumber", emoji: "🥒", type: "vegetable", indoors: [3,4], sow: [5], transplant: [4,5], harvest: [6,7,8,9] },
+  { name: "Zucchini", emoji: "🫒", type: "vegetable", indoors: [3,4], sow: [5], transplant: [4,5], harvest: [7,8,9] },
+  { name: "Bean", emoji: "🫘", type: "vegetable", indoors: [], sow: [4,5,8], transplant: [], harvest: [6,7,8,9,10] },
+  { name: "Corn", emoji: "🌽", type: "vegetable", indoors: [], sow: [5], transplant: [], harvest: [7,8,9] },
+  { name: "Pea", emoji: "🟢", type: "vegetable", indoors: [], sow: [3,8], transplant: [], harvest: [5,6,10] },
+  { name: "Radish", emoji: "🔴", type: "vegetable", indoors: [], sow: [3,9,10], transplant: [], harvest: [4,5,10,11] },
+  { name: "Spinach", emoji: "🥗", type: "vegetable", indoors: [3], sow: [3,9], transplant: [3,4], harvest: [5,6,10,11] },
+  { name: "Kale", emoji: "🥦", type: "vegetable", indoors: [2,3], sow: [3,8], transplant: [4], harvest: [5,6,10,11,12] },
+  { name: "Onion", emoji: "🧅", type: "vegetable", indoors: [2], sow: [3,4], transplant: [3,4], harvest: [6,7] },
+  { name: "Garlic", emoji: "🧄", type: "vegetable", indoors: [], sow: [11], transplant: [], harvest: [6,7] },
   { name: "Potato", emoji: "🥔", type: "vegetable", indoors: [], sow: [3,4], transplant: [], harvest: [6,7,8] },
-  { name: "Basil", emoji: "🌿", type: "herb", indoors: [3,4], sow: [5,6], transplant: [5], harvest: [6,7,8,9,10] },
-  { name: "Cilantro", emoji: "🍃", type: "herb", indoors: [], sow: [3,4,9], transplant: [], harvest: [5,6,10,11] },
-  { name: "Mint", emoji: "🌱", type: "herb", indoors: [2,3], sow: [4,5], transplant: [4,5], harvest: [5,6,7,8,9,10] },
-  { name: "Rosemary", emoji: "🪻", type: "herb", indoors: [2,3], sow: [], transplant: [4,5], harvest: [1,2,3,4,5,6,7,8,9,10,11,12] },
-  { name: "Dill", emoji: "🌿", type: "herb", indoors: [], sow: [4,5,8], transplant: [], harvest: [6,7,8,9,10] },
-  { name: "Parsley", emoji: "☘️", type: "herb", indoors: [2,3], sow: [4,5], transplant: [4], harvest: [5,6,7,8,9,10,11] },
-  { name: "Thyme", emoji: "🌾", type: "herb", indoors: [2,3], sow: [], transplant: [4,5], harvest: [1,2,3,4,5,6,7,8,9,10,11,12] },
-  { name: "Marigold", emoji: "🏵️", type: "flower", indoors: [3,4], sow: [5,6], transplant: [5], harvest: [6,7,8,9,10] },
-  { name: "Sunflower", emoji: "🌻", type: "flower", indoors: [3,4], sow: [4,5,6], transplant: [], harvest: [7,8,9,10] },
-  { name: "Zinnia", emoji: "🌺", type: "flower", indoors: [3,4], sow: [5,6], transplant: [5], harvest: [6,7,8,9,10] },
+  // HERBS — verified against Almanac 22046 data
+  { name: "Basil", emoji: "🌿", type: "herb", indoors: [3], sow: [5], transplant: [5], harvest: [6,7,8,9] },
+  { name: "Cilantro", emoji: "🍃", type: "herb", indoors: [], sow: [4,5], transplant: [], harvest: [5,6,7] },
+  { name: "Mint", emoji: "🌱", type: "herb", indoors: [2], sow: [4,5], transplant: [4,5], harvest: [5,6,7,8,9,10] },
+  { name: "Rosemary", emoji: "🪻", type: "herb", indoors: [1,2], sow: [], transplant: [5], harvest: [1,2,3,4,5,6,7,8,9,10,11,12] },
+  { name: "Dill", emoji: "🌿", type: "herb", indoors: [], sow: [4,5,9], transplant: [], harvest: [6,7,8,9] },
+  { name: "Parsley", emoji: "☘️", type: "herb", indoors: [2], sow: [3,4], transplant: [4,5], harvest: [5,6,7,8,9,10] },
+  { name: "Thyme", emoji: "🌾", type: "herb", indoors: [2], sow: [], transplant: [4,5], harvest: [1,2,3,4,5,6,7,8,9,10,11,12] },
+  // FLOWERS — Almanac doesn't cover all flowers; supplemented w/ VCE Zone 7a guides
+  { name: "Marigold", emoji: "🏵️", type: "flower", indoors: [3,4], sow: [5], transplant: [5], harvest: [6,7,8,9,10] },
+  { name: "Sunflower", emoji: "🌻", type: "flower", indoors: [], sow: [5], transplant: [], harvest: [8,9,10] },
+  { name: "Zinnia", emoji: "🌺", type: "flower", indoors: [3,4], sow: [5], transplant: [5], harvest: [7,8,9,10] },
   { name: "Nasturtium", emoji: "🧡", type: "flower", indoors: [], sow: [4,5], transplant: [], harvest: [6,7,8,9,10] },
-  { name: "Lavender", emoji: "💜", type: "flower", indoors: [2,3], sow: [], transplant: [4,5], harvest: [6,7,8] },
-  { name: "Cosmos", emoji: "🌸", type: "flower", indoors: [3,4], sow: [5,6], transplant: [5], harvest: [7,8,9,10] },
-  { name: "Echinacea", emoji: "🪷", type: "flower", indoors: [2,3], sow: [4,5], transplant: [5], harvest: [7,8,9] },
-  { name: "Black-eyed Susan", emoji: "🌼", type: "flower", indoors: [2,3], sow: [4,5], transplant: [5], harvest: [7,8,9,10] },
+  { name: "Lavender", emoji: "💜", type: "flower", indoors: [2], sow: [], transplant: [5], harvest: [6,7,8] },
+  { name: "Cosmos", emoji: "🌸", type: "flower", indoors: [3,4], sow: [5], transplant: [5], harvest: [7,8,9,10] },
+  { name: "Echinacea", emoji: "🪷", type: "flower", indoors: [2,3], sow: [5], transplant: [5], harvest: [7,8,9] },
+  { name: "Black-eyed Susan", emoji: "🌼", type: "flower", indoors: [2,3], sow: [5], transplant: [5], harvest: [7,8,9,10] },
   { name: "Blueberry", emoji: "🫐", type: "flower", indoors: [], sow: [], transplant: [3,4], harvest: [6,7,8] },
 ];
 
