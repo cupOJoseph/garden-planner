@@ -164,6 +164,8 @@
       <button onclick="filterAlmanac('vegetable')" class="almanac-filter text-xs px-3 py-1 rounded-full border">🥬 Vegetables</button>
       <button onclick="filterAlmanac('herb')" class="almanac-filter text-xs px-3 py-1 rounded-full border">🌿 Herbs</button>
       <button onclick="filterAlmanac('flower')" class="almanac-filter text-xs px-3 py-1 rounded-full border">🌸 Flowers</button>
+      <button onclick="filterAlmanac('fruit')" class="almanac-filter text-xs px-3 py-1 rounded-full border">🍓 Fruit</button>
+      <button onclick="filterAlmanac('indoor')" class="almanac-filter text-xs px-3 py-1 rounded-full border">🐱 Indoor</button>
     </div>
     <div id="almanac-table" class="space-y-1 text-sm"></div>
   </div>
@@ -225,6 +227,20 @@ const PLANTS = [
   { name: "Thyme", emoji: "🌾", type: "herb", companion: ["Tomato", "Eggplant"], avoid: [] },
   { name: "Dill", emoji: "🌿", type: "herb", companion: ["Cucumber", "Lettuce"], avoid: ["Carrot"] },
   { name: "Parsley", emoji: "☘️", type: "herb", companion: ["Tomato", "Corn"], avoid: [] },
+  { name: "Oregano", emoji: "🌿", type: "herb", companion: ["Pepper", "Tomato"], avoid: [] },
+  { name: "Sage", emoji: "🍃", type: "herb", companion: ["Rosemary", "Cabbage"], avoid: ["Cucumber"] },
+  { name: "Chives", emoji: "🌱", type: "herb", companion: ["Carrot", "Tomato"], avoid: ["Bean"] },
+  { name: "Lemon Balm", emoji: "🍋", type: "herb", companion: ["Tomato", "Squash"], avoid: [] },
+  // Vegetables (expanded)
+  { name: "Eggplant", emoji: "🍆", type: "vegetable", companion: ["Pepper", "Basil"], avoid: ["Fennel"] },
+  { name: "Broccoli", emoji: "🥦", type: "vegetable", companion: ["Onion", "Celery"], avoid: ["Tomato", "Strawberry"] },
+  { name: "Cauliflower", emoji: "🤍", type: "vegetable", companion: ["Bean", "Celery"], avoid: ["Tomato", "Strawberry"] },
+  { name: "Cabbage", emoji: "🥬", type: "vegetable", companion: ["Dill", "Onion"], avoid: ["Strawberry", "Tomato"] },
+  { name: "Sweet Potato", emoji: "🍠", type: "vegetable", companion: ["Bean", "Thyme"], avoid: ["Squash"] },
+  { name: "Swiss Chard", emoji: "🥬", type: "vegetable", companion: ["Bean", "Onion"], avoid: [] },
+  { name: "Beet", emoji: "🟤", type: "vegetable", companion: ["Lettuce", "Onion"], avoid: ["Bean"] },
+  { name: "Okra", emoji: "💚", type: "vegetable", companion: ["Pepper", "Eggplant"], avoid: [] },
+  { name: "Mustard Greens", emoji: "🟡", type: "vegetable", companion: ["Onion", "Garlic"], avoid: ["Strawberry"] },
   // Flowers
   { name: "Marigold", emoji: "🏵️", type: "flower", companion: ["Tomato", "Pepper"], avoid: [] },
   { name: "Sunflower", emoji: "🌻", type: "flower", companion: ["Corn", "Cucumber"], avoid: ["Potato"] },
@@ -235,8 +251,13 @@ const PLANTS = [
   { name: "Petunia", emoji: "🩷", type: "flower", companion: ["Tomato", "Pepper"], avoid: [] },
   { name: "Black-eyed Susan", emoji: "🌼", type: "flower", companion: [], avoid: [] },
   { name: "Echinacea", emoji: "🪷", type: "flower", companion: [], avoid: [] },
+  { name: "Morning Glory", emoji: "💙", type: "flower", companion: ["Corn"], avoid: [] },
   // Fruit
-  { name: "Blueberry", emoji: "🫐", type: "flower", companion: ["Strawberry"], avoid: [] },
+  { name: "Strawberry", emoji: "🍓", type: "fruit", companion: ["Spinach", "Lettuce", "Borage"], avoid: ["Cabbage", "Broccoli"] },
+  { name: "Blueberry", emoji: "🫐", type: "fruit", companion: ["Strawberry"], avoid: [] },
+  { name: "Raspberry", emoji: "🫐", type: "fruit", companion: ["Garlic", "Tansy"], avoid: ["Potato"] },
+  // Indoor-only
+  { name: "Cat Grass", emoji: "🐱", type: "indoor", companion: [], avoid: [] },
 ];
 
 // Zone 7a almanac — Falls Church, VA (ZIP 22046)
@@ -277,7 +298,26 @@ const ALMANAC = [
   { name: "Cosmos", emoji: "🌸", type: "flower", indoors: [3,4], sow: [5], transplant: [5], harvest: [7,8,9,10] },
   { name: "Echinacea", emoji: "🪷", type: "flower", indoors: [2,3], sow: [5], transplant: [5], harvest: [7,8,9] },
   { name: "Black-eyed Susan", emoji: "🌼", type: "flower", indoors: [2,3], sow: [5], transplant: [5], harvest: [7,8,9,10] },
-  { name: "Blueberry", emoji: "🫐", type: "flower", indoors: [], sow: [], transplant: [3,4], harvest: [6,7,8] },
+  { name: "Blueberry", emoji: "🫐", type: "fruit", indoors: [], sow: [], transplant: [3,4], harvest: [6,7,8] },
+  // NEW — verified against Almanac 22046
+  { name: "Eggplant", emoji: "🍆", type: "vegetable", indoors: [2,3], sow: [], transplant: [5], harvest: [7,8,9] },
+  { name: "Broccoli", emoji: "🥦", type: "vegetable", indoors: [3], sow: [], transplant: [4], harvest: [6,7,8] },
+  { name: "Cauliflower", emoji: "🤍", type: "vegetable", indoors: [3], sow: [], transplant: [4], harvest: [6,7] },
+  { name: "Cabbage", emoji: "🥬", type: "vegetable", indoors: [2,3], sow: [], transplant: [3,4], harvest: [6,7] },
+  { name: "Sweet Potato", emoji: "🍠", type: "vegetable", indoors: [], sow: [], transplant: [5], harvest: [9,10] },
+  { name: "Swiss Chard", emoji: "🥬", type: "vegetable", indoors: [3], sow: [4], transplant: [4], harvest: [5,6,7,8,9] },
+  { name: "Beet", emoji: "🟤", type: "vegetable", indoors: [], sow: [3,4,8], transplant: [4], harvest: [5,6,10] },
+  { name: "Okra", emoji: "💚", type: "vegetable", indoors: [3,4], sow: [5], transplant: [5], harvest: [7,8,9,10] },
+  { name: "Mustard Greens", emoji: "🟡", type: "vegetable", indoors: [3], sow: [3,4,8,9], transplant: [3,4], harvest: [5,6,10,11] },
+  { name: "Oregano", emoji: "🌿", type: "herb", indoors: [2,3], sow: [], transplant: [4,5], harvest: [5,6,7,8,9,10] },
+  { name: "Sage", emoji: "🍃", type: "herb", indoors: [2,3], sow: [], transplant: [4,5], harvest: [5,6,7,8,9,10] },
+  { name: "Chives", emoji: "🌱", type: "herb", indoors: [2,3], sow: [3,4,8], transplant: [3,4], harvest: [5,6,7,8,9,10] },
+  { name: "Lemon Balm", emoji: "🍋", type: "herb", indoors: [2,3], sow: [4,5], transplant: [4,5], harvest: [5,6,7,8,9,10] },
+  { name: "Morning Glory", emoji: "💙", type: "flower", indoors: [3,4], sow: [5], transplant: [], harvest: [7,8,9,10] },
+  { name: "Petunia", emoji: "🩷", type: "flower", indoors: [2,3], sow: [], transplant: [5], harvest: [5,6,7,8,9,10] },
+  { name: "Strawberry", emoji: "🍓", type: "fruit", indoors: [], sow: [], transplant: [3,4], harvest: [5,6,7] },
+  { name: "Raspberry", emoji: "🫐", type: "fruit", indoors: [], sow: [], transplant: [3,4], harvest: [6,7,8] },
+  { name: "Cat Grass", emoji: "🐱", type: "indoor", indoors: [], sow: [1,2,3,4,5,6,7,8,9,10,11,12], transplant: [], harvest: [1,2,3,4,5,6,7,8,9,10,11,12] },
 ];
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -292,6 +332,7 @@ const INDOOR_CARE = {
   "rubber plant": { light: "Bright Indirect", water: "Every 1-2 weeks", humidity: "Medium", difficulty: 2, tip: "Wipe glossy leaves to maximize light absorption. Prune for bushiness." },
   "aloe vera": { light: "Bright Direct", water: "Every 2-3 weeks", humidity: "Low", difficulty: 1, tip: "Needs well-draining soil. Gel soothes burns. Offsets easily." },
   "orchid": { light: "Bright Indirect", water: "Weekly (ice cube method)", humidity: "High", difficulty: 3, tip: "Don't use soil — bark/moss mix. Cut spent stems above a node for reblooming." },
+  "cat grass": { light: "Low-Bright", water: "Every 2-3 days", humidity: "Low", difficulty: 1, tip: "Oat/wheat/barley grass for cats. Sprouts in 3-5 days, ready in 10-14 days. Resow every 2-3 weeks. Any windowsill works." },
   "default": { light: "Medium", water: "Check weekly", humidity: "Medium", difficulty: 2, tip: "Research this specific species for best care. When in doubt, underwater rather than overwater." },
 };
 
