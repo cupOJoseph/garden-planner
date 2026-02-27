@@ -726,13 +726,13 @@ function renderSchedule() {
         
         return `<div class="inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-full text-xs border bg-gray-50 border-gray-200">
           <span>${emoji} ${name}</span>
-          ${hasOutdoor ? `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-200 text-green-800">🌤️<button onclick="removeCropEntry('${name}','outdoor')" class="hover:text-red-600 ml-0.5">✕</button></span>` : ''}
-          ${hasIndoor ? `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-purple-200 text-purple-800">🏠<button onclick="removeCropEntry('${name}','indoor')" class="hover:text-red-600 ml-0.5">✕</button></span>` : ''}
-          ${!hasBoth ? `<button onclick="addCropSetting('${name}')" class="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-200 text-gray-600 hover:bg-gray-300" title="Add ${hasOutdoor ? 'indoor' : 'outdoor'} too">+ ${hasOutdoor ? '🏠' : '🌤️'}</button>` : ''}
+          ${hasOutdoor ? `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-200 text-green-800" title="Destined for outdoor beds">🌤️ Bed<button onclick="removeCropEntry('${name}','outdoor')" class="hover:text-red-600 ml-0.5">✕</button></span>` : ''}
+          ${hasIndoor ? `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-purple-200 text-purple-800" title="Stays indoors permanently">🏠 Stays in<button onclick="removeCropEntry('${name}','indoor')" class="hover:text-red-600 ml-0.5">✕</button></span>` : ''}
+          ${!hasBoth ? `<button onclick="addCropSetting('${name}')" class="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-200 text-gray-600 hover:bg-gray-300" title="Also grow ${hasOutdoor ? 'indoors (stays in pot)' : 'outdoors (transplant to bed)'}">+ ${hasOutdoor ? '🏠' : '🌤️'}</button>` : ''}
         </div>`;
       }).join('')}
     </div>
-    <p class="text-[10px] text-gray-400">🏠 Indoor skips transplant. Add both indoor + outdoor for the same crop if you want both schedules.</p>
+    <p class="text-[10px] text-gray-400">🏠 = stays indoors (skips transplant) · 🌤️ = destined for outdoor beds (full cycle incl. transplant). Same crop can have both!</p>
   `;
 
   const currentMonth = new Date().getMonth() + 1;
@@ -750,7 +750,11 @@ function renderSchedule() {
     const meta = ACTION_META[action];
     if (!plant || !meta) return;
     const isIndoor = setting === 'indoor';
-    schedule[m].push({ plant, action: meta.label, cls: meta.cls, icon: meta.icon, key: taskKey, isIndoor });
+    // Relabel for indoor-destination plants
+    let label = meta.label;
+    if (isIndoor && action === 'indoors') label = 'Sow (stays indoor)';
+    if (isIndoor && action === 'sow') label = 'Sow (stays indoor)';
+    schedule[m].push({ plant, action: label, cls: meta.cls, icon: meta.icon, key: taskKey, isIndoor });
   });
 
   // Current month summary
