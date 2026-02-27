@@ -381,12 +381,14 @@ let beds = JSON.parse(localStorage.getItem('garden_beds') || 'null') || [
 let pots = JSON.parse(localStorage.getItem('garden_pots') || '[]');
 let indoorPlants = JSON.parse(localStorage.getItem('indoor_plants') || '[]');
 let favorites = JSON.parse(localStorage.getItem('garden_favorites') || '[]');
+let savedTasks = JSON.parse(localStorage.getItem('garden_tasks') || '[]'); // "PlantName|action|month"
 
 function save() {
   localStorage.setItem('garden_beds', JSON.stringify(beds));
   localStorage.setItem('garden_pots', JSON.stringify(pots));
   localStorage.setItem('indoor_plants', JSON.stringify(indoorPlants));
   localStorage.setItem('garden_favorites', JSON.stringify(favorites));
+  localStorage.setItem('garden_tasks', JSON.stringify(savedTasks));
 }
 
 // ===== TABS =====
@@ -524,14 +526,20 @@ function renderAlmanac() {
     const bars = MONTHS.map((_, mi) => {
       const m = mi + 1;
       let cls = '';
-      if (plant.indoors?.includes(m)) cls = 'sow-indoor';
-      else if (plant.transplant?.includes(m)) cls = 'transplant';
-      else if (plant.sow?.includes(m)) cls = 'sow-outdoor';
-      else if (plant.harvest?.includes(m)) cls = 'harvest';
-      return `<div class="flex-1 px-0.5"><div class="month-bar ${cls}" style="height:${cls ? '20px' : '20px'}; ${cls ? '' : 'background:transparent;'}">${''}</div></div>`;
+      let action = '';
+      if (plant.indoors?.includes(m)) { cls = 'sow-indoor'; action = 'indoors'; }
+      else if (plant.transplant?.includes(m)) { cls = 'transplant'; action = 'transplant'; }
+      else if (plant.sow?.includes(m)) { cls = 'sow-outdoor'; action = 'sow'; }
+      else if (plant.harvest?.includes(m)) { cls = 'harvest'; action = 'harvest'; }
+      const taskKey = `${plant.name}|${action}|${m}`;
+      const isSelected = action && savedTasks.includes(taskKey);
+      const ring = isSelected ? 'outline outline-2 outline-offset-1 outline-yellow-400' : '';
+      const clickHandler = action ? `onclick="toggleTask('${plant.name}','${action}',${m})"` : '';
+      const cursor = action ? 'cursor-pointer hover:opacity-80' : '';
+      return `<div class="flex-1 px-0.5"><div class="month-bar ${cls} ${ring} ${cursor}" ${clickHandler} style="height:20px; ${cls ? '' : 'background:transparent;'}" title="${action ? (isSelected ? 'Remove from schedule' : 'Click to add to schedule') : ''}"></div></div>`;
     }).join('');
     return `<div class="flex items-center gap-0 py-1 hover:bg-gray-50 rounded">
-      <button onclick="toggleFavorite('${plant.name}')" class="w-8 shrink-0 text-center text-sm hover:scale-125 transition-transform" title="${isFav ? 'Remove from schedule' : 'Add to schedule'}">${isFav ? '⭐' : '☆'}</button>
+      <button onclick="toggleAllFavorite('${plant.name}')" class="w-8 shrink-0 text-center text-sm hover:scale-125 transition-transform" title="${isFav ? 'Remove all from schedule' : 'Add all to schedule'}">${isFav ? '⭐' : '☆'}</button>
       <div class="w-32 shrink-0 text-sm">${plant.emoji} ${plant.name}</div>
       ${bars}
     </div>`;
@@ -545,11 +553,43 @@ function renderAlmanac() {
   }
 }
 
-// ===== SCHEDULE (FAVORITES) =====
-function toggleFavorite(name) {
-  const idx = favorites.indexOf(name);
-  if (idx >= 0) favorites.splice(idx, 1);
-  else favorites.push(name);
+// ===== SCHEDULE (TASK-BASED) =====
+const ACTION_META = {
+  indoors:    { label: 'Start Indoors', cls: 'sow-indoor', icon: '🏠' },
+  sow:        { label: 'Direct Sow',    cls: 'sow-outdoor', icon: '🌱' },
+  transplant: { label: 'Transplant',     cls: 'transplant',  icon: '🪴' },
+  harvest:    { label: 'Harvest',        cls: 'harvest',     icon: '🧺' },
+};
+
+function toggleTask(name, action, month) {
+  const key = `${name}|${action}|${month}`;
+  const idx = savedTasks.indexOf(key);
+  if (idx >= 0) savedTasks.splice(idx, 1);
+  else savedTasks.push(key);
+  // Update favorites list (for star display)
+  const hasAnyTask = savedTasks.some(t => t.startsWith(name + '|'));
+  const favIdx = favorites.indexOf(name);
+  if (hasAnyTask && favIdx < 0) favorites.push(name);
+  if (!hasAnyTask && favIdx >= 0) favorites.splice(favIdx, 1);
+  save(); renderAlmanac(); renderSchedule();
+}
+
+function toggleAllFavorite(name) {
+  const existing = savedTasks.filter(t => t.startsWith(name + '|'));
+  if (existing.length) {
+    // Remove all tasks for this plant
+    savedTasks = savedTasks.filter(t => !t.startsWith(name + '|'));
+    favorites = favorites.filter(f => f !== name);
+  } else {
+    // Add ALL tasks for this plant
+    const plant = ALMANAC.find(p => p.name === name);
+    if (!plant) return;
+    (plant.indoors || []).forEach(m => { const k = `${name}|indoors|${m}`; if (!savedTasks.includes(k)) savedTasks.push(k); });
+    (plant.sow || []).forEach(m => { const k = `${name}|sow|${m}`; if (!savedTasks.includes(k)) savedTasks.push(k); });
+    (plant.transplant || []).forEach(m => { const k = `${name}|transplant|${m}`; if (!savedTasks.includes(k)) savedTasks.push(k); });
+    (plant.harvest || []).forEach(m => { const k = `${name}|harvest|${m}`; if (!savedTasks.includes(k)) savedTasks.push(k); });
+    if (!favorites.includes(name)) favorites.push(name);
+  }
   save(); renderAlmanac(); renderSchedule();
 }
 
@@ -558,26 +598,28 @@ function renderSchedule() {
   const nowEl = document.getElementById('schedule-now');
   const emptyEl = document.getElementById('no-schedule');
   
-  if (!favorites.length) {
+  if (!savedTasks.length) {
     timeline.innerHTML = '';
-    nowEl.innerHTML = '';
+    nowEl.innerHTML = '<p class="text-sm text-green-700">Click colored bars on the 📅 Planting Calendar to pick specific planting windows, or click ⭐ to add all windows for a crop.</p>';
     emptyEl.classList.remove('hidden');
     return;
   }
   emptyEl.classList.add('hidden');
 
-  const currentMonth = new Date().getMonth() + 1; // 1-indexed
-  const favPlants = ALMANAC.filter(p => favorites.includes(p.name));
+  const currentMonth = new Date().getMonth() + 1;
 
-  // Build tasks per month
+  // Parse tasks into monthly schedule
   const schedule = {};
   for (let m = 1; m <= 12; m++) schedule[m] = [];
 
-  favPlants.forEach(plant => {
-    (plant.indoors || []).forEach(m => schedule[m].push({ plant, action: 'Start Indoors', cls: 'sow-indoor', icon: '🏠' }));
-    (plant.sow || []).forEach(m => schedule[m].push({ plant, action: 'Direct Sow', cls: 'sow-outdoor', icon: '🌱' }));
-    (plant.transplant || []).forEach(m => schedule[m].push({ plant, action: 'Transplant', cls: 'transplant', icon: '🪴' }));
-    (plant.harvest || []).forEach(m => schedule[m].push({ plant, action: 'Harvest', cls: 'harvest', icon: '🧺' }));
+  savedTasks.forEach(taskKey => {
+    const [name, action, monthStr] = taskKey.split('|');
+    const m = parseInt(monthStr);
+    const plant = ALMANAC.find(p => p.name === name);
+    const meta = ACTION_META[action];
+    if (plant && meta) {
+      schedule[m].push({ plant, action: meta.label, cls: meta.cls, icon: meta.icon, key: taskKey });
+    }
   });
 
   // Current month summary
@@ -593,7 +635,7 @@ function renderSchedule() {
     nowEl.innerHTML = `<p class="text-sm text-green-700">📍 ${MONTHS[currentMonth - 1]} — Nothing scheduled this month. Relax! 🌿</p>`;
   }
 
-  // Full 12-month timeline
+  // Full 12-month timeline with remove buttons
   timeline.innerHTML = Array.from({length: 12}, (_, i) => {
     const m = i + 1;
     const tasks = schedule[m];
@@ -614,9 +656,10 @@ function renderSchedule() {
         <div class="w-10 text-xs font-semibold ${isCurrent ? 'text-green-700' : 'text-gray-600'} pt-1">${MONTHS[i]}${isCurrent ? ' ◀' : ''}</div>
         <div class="flex-1 border-l-2 ${isCurrent ? 'border-green-400' : 'border-gray-200'} pl-4 py-1 space-y-1">
           ${tasks.map(t => `
-            <div class="flex items-center gap-2 text-sm">
+            <div class="flex items-center gap-2 text-sm group">
               <span class="month-bar ${t.cls} inline-block px-2 py-0.5 rounded text-xs">${t.icon} ${t.action}</span>
               <span>${t.plant.emoji} ${t.plant.name}</span>
+              <button onclick="removeTask('${t.key}')" class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 text-xs transition-opacity" title="Remove">✕</button>
             </div>
           `).join('')}
         </div>
@@ -625,25 +668,34 @@ function renderSchedule() {
   }).join('');
 }
 
+function removeTask(key) {
+  savedTasks = savedTasks.filter(t => t !== key);
+  const name = key.split('|')[0];
+  if (!savedTasks.some(t => t.startsWith(name + '|'))) {
+    favorites = favorites.filter(f => f !== name);
+  }
+  save(); renderAlmanac(); renderSchedule();
+}
+
 function exportSchedule() {
-  if (!favorites.length) { alert('Add some crops first!'); return; }
-  const favPlants = ALMANAC.filter(p => favorites.includes(p.name));
+  if (!savedTasks.length) { alert('Add some planting windows first!'); return; }
   let text = '🌱 NOVA Garden Planting Schedule (Zone 7a)\n\n';
   
   for (let m = 1; m <= 12; m++) {
-    const tasks = [];
-    favPlants.forEach(plant => {
-      if (plant.indoors?.includes(m)) tasks.push(`🏠 Start Indoors: ${plant.name}`);
-      if (plant.sow?.includes(m)) tasks.push(`🌱 Direct Sow: ${plant.name}`);
-      if (plant.transplant?.includes(m)) tasks.push(`🪴 Transplant: ${plant.name}`);
-      if (plant.harvest?.includes(m)) tasks.push(`🧺 Harvest: ${plant.name}`);
-    });
+    const tasks = savedTasks
+      .filter(t => parseInt(t.split('|')[2]) === m)
+      .map(t => {
+        const [name, action] = t.split('|');
+        const plant = ALMANAC.find(p => p.name === name);
+        const meta = ACTION_META[action];
+        return plant && meta ? `${meta.icon} ${meta.label}: ${plant.name}` : null;
+      })
+      .filter(Boolean);
     if (tasks.length) {
       text += `${MONTHS[m-1]}:\n${tasks.map(t => `  ${t}`).join('\n')}\n\n`;
     }
   }
   navigator.clipboard.writeText(text).then(() => alert('Schedule copied to clipboard!')).catch(() => {
-    // Fallback
     const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
     alert('Schedule copied to clipboard!');
   });
