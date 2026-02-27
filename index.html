@@ -65,7 +65,11 @@
       cursor: pointer; transition: all 0.2s; position: relative;
     }
     .pot:hover { transform: scale(1.05); }
-    .pot-rim { height: 6px; background: #D84315; border-radius: 4px 4px 0 0; margin: -8px -8px 6px -8px; }
+    .pot-rim { height: 6px; border-radius: 4px 4px 0 0; margin: -8px -8px 6px -8px; }
+    .pot-rim.outdoor { background: #D84315; }
+    .pot-rim.indoor { background: #7B1FA2; }
+    .pot.indoor-pot { background: linear-gradient(180deg, #6A1B9A 0%, #4A148C 100%); }
+    .pot .window-tag { font-size: 0.55rem; background: rgba(255,255,255,0.2); border-radius: 3px; padding: 1px 4px; margin-top: 2px; display: inline-block; }
     .pot .remove-pot {
       display: none; position: absolute; top: -6px; right: -6px;
       background: #ef4444; color: white; border-radius: 50%;
@@ -139,11 +143,21 @@
         <!-- Pots -->
         <div>
           <div class="flex items-center justify-between mb-3">
-            <h3 class="font-semibold text-gray-700">🪴 Pots</h3>
-            <button onclick="addPot()" class="text-sm px-3 py-1 rounded-full bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition">+ Add Pot</button>
+            <h3 class="font-semibold text-gray-700">🪴 Outdoor Pots</h3>
+            <button onclick="addPot('outdoor')" class="text-sm px-3 py-1 rounded-full bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition">+ Add Outdoor Pot</button>
           </div>
-          <div id="pots-container" class="flex flex-wrap gap-4"></div>
-          <p id="no-pots" class="text-sm text-gray-400 italic">No pots yet. Click "Add Pot" to start.</p>
+          <div id="pots-outdoor" class="flex flex-wrap gap-4"></div>
+          <p id="no-pots-outdoor" class="text-sm text-gray-400 italic">No outdoor pots yet.</p>
+          
+          <div class="flex items-center justify-between mb-3 mt-6">
+            <div>
+              <h3 class="font-semibold text-gray-700">🏠 Indoor Pots</h3>
+              <p class="text-xs text-gray-400">Front windows (ESE) = morning sun · Back windows (WNW) = afternoon sun</p>
+            </div>
+            <button onclick="addPot('indoor')" class="text-sm px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition">+ Add Indoor Pot</button>
+          </div>
+          <div id="pots-indoor" class="flex flex-wrap gap-4"></div>
+          <p id="no-pots-indoor" class="text-sm text-gray-400 italic">No indoor pots yet.</p>
         </div>
       </div>
     </div>
@@ -467,21 +481,48 @@ function resizeBed(bi) {
 
 // ===== POTS =====
 function renderPots() {
-  const container = document.getElementById('pots-container');
-  document.getElementById('no-pots').style.display = pots.length ? 'none' : 'block';
-  container.innerHTML = pots.map((pot, i) => {
+  const outdoorPots = pots.filter(p => p.location !== 'indoor');
+  const indoorPots = pots.filter(p => p.location === 'indoor');
+
+  const outdoorContainer = document.getElementById('pots-outdoor');
+  const indoorContainer = document.getElementById('pots-indoor');
+  document.getElementById('no-pots-outdoor').style.display = outdoorPots.length ? 'none' : 'block';
+  document.getElementById('no-pots-indoor').style.display = indoorPots.length ? 'none' : 'block';
+
+  outdoorContainer.innerHTML = outdoorPots.map((pot) => {
+    const i = pots.indexOf(pot);
     const p = pot.plant ? PLANTS.find(pp => pp.name === pot.plant) : null;
     return `<div class="pot" onclick="clickPot(${i})">
-      <div class="pot-rim"></div>
+      <div class="pot-rim outdoor"></div>
       <div class="text-2xl mb-1">${p ? p.emoji : '➕'}</div>
       <div class="text-xs text-white/80 truncate">${p ? p.name : 'Empty'}</div>
       <span class="remove-pot" onclick="event.stopPropagation(); removePot(${i})">×</span>
     </div>`;
   }).join('');
+
+  indoorContainer.innerHTML = indoorPots.map((pot) => {
+    const i = pots.indexOf(pot);
+    const p = pot.plant ? PLANTS.find(pp => pp.name === pot.plant) : null;
+    // Determine window recommendation
+    let windowTag = '';
+    if (p) {
+      const care = Object.entries(INDOOR_CARE).find(([key]) => p.name.toLowerCase().includes(key));
+      const lightNeed = care ? care[1].light : 'Medium';
+      const placement = WINDOW_PLACEMENT[lightNeed] || WINDOW_PLACEMENT['Medium'];
+      windowTag = `<div class="window-tag">${placement.rec.replace('🪟 ', '')}</div>`;
+    }
+    return `<div class="pot indoor-pot" onclick="clickPot(${i})">
+      <div class="pot-rim indoor"></div>
+      <div class="text-2xl mb-1">${p ? p.emoji : '➕'}</div>
+      <div class="text-xs text-white/80 truncate">${p ? p.name : 'Empty'}</div>
+      ${p ? windowTag : ''}
+      <span class="remove-pot" onclick="event.stopPropagation(); removePot(${i})">×</span>
+    </div>`;
+  }).join('');
 }
 
-function addPot() {
-  pots.push({ plant: null });
+function addPot(location) {
+  pots.push({ plant: null, location: location || 'outdoor' });
   save(); renderPots();
 }
 
