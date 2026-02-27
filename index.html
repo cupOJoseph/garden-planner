@@ -610,57 +610,35 @@ function renderSchedule() {
   if (!favorites.length) {
     cropsEl.innerHTML = '';
     timeline.innerHTML = '';
-    nowEl.innerHTML = '<p class="text-sm text-green-700">Star ⭐ crops on the 📅 Planting Calendar to build your schedule.</p>';
+    nowEl.innerHTML = '';
     emptyEl.classList.remove('hidden');
     return;
   }
   emptyEl.classList.add('hidden');
 
   const favPlants = ALMANAC.filter(p => favorites.includes(p.name));
-
-  // Determine indoor/outdoor per plant based on where they're planted (pots + beds)
-  const plantLocations = {}; // name → Set of 'indoor'|'outdoor'
-  favorites.forEach(name => plantLocations[name] = new Set());
-  
-  // Check beds (always outdoor)
-  beds.forEach(bed => {
-    Object.values(bed.cells).forEach(plantName => {
-      if (plantLocations[plantName]) plantLocations[plantName].add('outdoor');
-    });
-  });
-  // Check pots
-  pots.forEach(pot => {
-    if (pot.plant && plantLocations[pot.plant]) {
-      plantLocations[pot.plant].add(pot.location === 'indoor' ? 'indoor' : 'outdoor');
-    }
-  });
-
-  // Crop pills showing where they're planted
-  cropsEl.innerHTML = `
-    <div class="flex flex-wrap gap-2 mb-3">
-      ${favorites.map(name => {
-        const plant = ALMANAC.find(p => p.name === name);
-        const emoji = plant ? plant.emoji : '🌱';
-        const locs = plantLocations[name];
-        const hasOutdoor = locs.has('outdoor');
-        const hasIndoor = locs.has('indoor');
-        const locBadge = hasOutdoor && hasIndoor ? '🌤️+🏠'
-          : hasOutdoor ? '🌤️ Bed'
-          : hasIndoor ? '🏠 Indoor'
-          : '⚪ Not planted';
-        const locClass = hasIndoor && !hasOutdoor ? 'bg-purple-50 border-purple-200'
-          : hasOutdoor ? 'bg-green-50 border-green-200'
-          : 'bg-gray-50 border-gray-200';
-        return `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border ${locClass}">
-          ${emoji} ${name} <span class="text-[10px] opacity-70">${locBadge}</span>
-          <button onclick="toggleFavorite('${name}')" class="text-gray-400 hover:text-red-500 ml-0.5">✕</button>
-        </span>`;
-      }).join('')}
-    </div>
-    <p class="text-[10px] text-gray-400 mb-1">Location is based on where you've planted: beds = outdoor, pots = indoor or outdoor. Indoor plants skip transplant.</p>
-  `;
-
   const currentMonth = new Date().getMonth() + 1;
+
+  // Determine indoor/outdoor per plant from pot/bed placement
+  const plantLocations = {};
+  favorites.forEach(name => plantLocations[name] = new Set());
+  beds.forEach(bed => Object.values(bed.cells).forEach(name => { if (plantLocations[name]) plantLocations[name].add('outdoor'); }));
+  pots.forEach(pot => { if (pot.plant && plantLocations[pot.plant]) plantLocations[pot.plant].add(pot.location === 'indoor' ? 'indoor' : 'outdoor'); });
+
+  // Crop pills
+  cropsEl.innerHTML = `<div class="flex flex-wrap gap-2 mb-3">
+    ${favorites.map(name => {
+      const plant = ALMANAC.find(p => p.name === name);
+      const emoji = plant ? plant.emoji : '🌱';
+      const locs = plantLocations[name];
+      const badge = locs.has('outdoor') && locs.has('indoor') ? '🌤️+🏠'
+        : locs.has('outdoor') ? '🌤️' : locs.has('indoor') ? '🏠' : '';
+      return `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border bg-green-50 border-green-200">
+        ${emoji} ${name} ${badge ? `<span class="text-[10px]">${badge}</span>` : ''}
+        <button onclick="toggleFavorite('${name}')" class="text-gray-400 hover:text-red-500">✕</button>
+      </span>`;
+    }).join('')}
+  </div>`;
 
   // Build tasks per month
   const schedule = {};
@@ -668,70 +646,37 @@ function renderSchedule() {
 
   favPlants.forEach(plant => {
     const locs = plantLocations[plant.name];
-    const isIndoorOnly = locs.has('indoor') && !locs.has('outdoor');
-    
-    (plant.indoors || []).forEach(m => schedule[m].push({
-      plant, action: isIndoorOnly ? 'Sow (indoor)' : 'Start Indoors',
-      cls: 'sow-indoor', icon: '🏠', isIndoor: isIndoorOnly
-    }));
-    (plant.sow || []).forEach(m => schedule[m].push({
-      plant, action: isIndoorOnly ? 'Sow (indoor)' : 'Direct Sow',
-      cls: 'sow-outdoor', icon: '🌱', isIndoor: isIndoorOnly
-    }));
-    // Skip transplant for indoor-only plants
+    const isIndoorOnly = locs.size > 0 && locs.has('indoor') && !locs.has('outdoor');
+
+    (plant.indoors || []).forEach(m => schedule[m].push({ plant, action: 'Start Indoors', cls: 'sow-indoor', icon: '🏠' }));
+    (plant.sow || []).forEach(m => schedule[m].push({ plant, action: 'Direct Sow', cls: 'sow-outdoor', icon: '🌱' }));
     if (!isIndoorOnly) {
-      (plant.transplant || []).forEach(m => schedule[m].push({
-        plant, action: 'Transplant', cls: 'transplant', icon: '🪴', isIndoor: false
-      }));
+      (plant.transplant || []).forEach(m => schedule[m].push({ plant, action: 'Transplant', cls: 'transplant', icon: '🪴' }));
     }
-    (plant.harvest || []).forEach(m => schedule[m].push({
-      plant, action: 'Harvest', cls: 'harvest', icon: '🧺', isIndoor: isIndoorOnly
-    }));
+    (plant.harvest || []).forEach(m => schedule[m].push({ plant, action: 'Harvest', cls: 'harvest', icon: '🧺' }));
   });
 
-  // Current month summary
+  // Current month
   const thisMonth = schedule[currentMonth];
-  if (thisMonth.length) {
-    nowEl.innerHTML = `
-      <p class="font-semibold text-green-800 text-sm mb-2">📍 This month (${MONTHS[currentMonth - 1]}) — ${thisMonth.length} task${thisMonth.length > 1 ? 's' : ''}</p>
-      <div class="flex flex-wrap gap-2">
-        ${thisMonth.map(t => `<span class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-white border border-green-200 text-green-800">${t.icon} ${t.action}: ${t.plant.emoji} ${t.plant.name}</span>`).join('')}
-      </div>
-    `;
-  } else {
-    nowEl.innerHTML = `<p class="text-sm text-green-700">📍 ${MONTHS[currentMonth - 1]} — Nothing scheduled this month. Relax! 🌿</p>`;
-  }
+  nowEl.innerHTML = thisMonth.length
+    ? `<p class="font-semibold text-green-800 text-sm mb-2">📍 This month (${MONTHS[currentMonth - 1]}) — ${thisMonth.length} task${thisMonth.length !== 1 ? 's' : ''}</p>
+       <div class="flex flex-wrap gap-2">${thisMonth.map(t => `<span class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-white border border-green-200 text-green-800">${t.icon} ${t.action}: ${t.plant.emoji} ${t.plant.name}</span>`).join('')}</div>`
+    : `<p class="text-sm text-green-700">📍 ${MONTHS[currentMonth - 1]} — Nothing scheduled this month. Relax! 🌿</p>`;
 
-  // Full 12-month timeline
+  // Timeline
   timeline.innerHTML = Array.from({length: 12}, (_, i) => {
-    const m = i + 1;
-    const tasks = schedule[m];
-    const isCurrent = m === currentMonth;
-    const isPast = m < currentMonth;
-    
-    if (!tasks.length) return `
-      <div class="flex items-start gap-3 ${isPast ? 'opacity-40' : ''}">
-        <div class="w-10 text-xs font-medium ${isCurrent ? 'text-green-700' : 'text-gray-400'} pt-1">${MONTHS[i]}</div>
-        <div class="flex-1 border-l-2 ${isCurrent ? 'border-green-400' : 'border-gray-200'} pl-4 py-1">
-          <p class="text-xs text-gray-300 italic">—</p>
-        </div>
-      </div>
-    `;
-
-    return `
-      <div class="flex items-start gap-3 ${isPast ? 'opacity-50' : ''}">
-        <div class="w-10 text-xs font-semibold ${isCurrent ? 'text-green-700' : 'text-gray-600'} pt-1">${MONTHS[i]}${isCurrent ? ' ◀' : ''}</div>
-        <div class="flex-1 border-l-2 ${isCurrent ? 'border-green-400' : 'border-gray-200'} pl-4 py-1 space-y-1">
-          ${tasks.map(t => `
-            <div class="flex items-center gap-2 text-sm">
-              <span class="month-bar ${t.cls} inline-block px-2 py-0.5 rounded text-xs">${t.icon} ${t.action}</span>
-              <span>${t.plant.emoji} ${t.plant.name}</span>
-              <span class="text-[10px] px-1.5 py-0.5 rounded ${t.isIndoor ? 'bg-purple-100 text-purple-600' : 'bg-green-100 text-green-600'}">${t.isIndoor ? '🏠' : '🌤️'}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
+    const m = i + 1, tasks = schedule[m], isCurrent = m === currentMonth, isPast = m < currentMonth;
+    if (!tasks.length) return `<div class="flex items-start gap-3 ${isPast ? 'opacity-40' : ''}">
+      <div class="w-10 text-xs font-medium ${isCurrent ? 'text-green-700' : 'text-gray-400'} pt-1">${MONTHS[i]}</div>
+      <div class="flex-1 border-l-2 ${isCurrent ? 'border-green-400' : 'border-gray-200'} pl-4 py-1"><p class="text-xs text-gray-300 italic">—</p></div></div>`;
+    return `<div class="flex items-start gap-3 ${isPast ? 'opacity-50' : ''}">
+      <div class="w-10 text-xs font-semibold ${isCurrent ? 'text-green-700' : 'text-gray-600'} pt-1">${MONTHS[i]}${isCurrent ? ' ◀' : ''}</div>
+      <div class="flex-1 border-l-2 ${isCurrent ? 'border-green-400' : 'border-gray-200'} pl-4 py-1 space-y-1">
+        ${tasks.map(t => `<div class="flex items-center gap-2 text-sm">
+          <span class="month-bar ${t.cls} inline-block px-2 py-0.5 rounded text-xs">${t.icon} ${t.action}</span>
+          <span>${t.plant.emoji} ${t.plant.name}</span>
+        </div>`).join('')}
+      </div></div>`;
   }).join('');
 }
 
