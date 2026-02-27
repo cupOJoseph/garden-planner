@@ -114,6 +114,7 @@
   <div class="flex gap-1 mb-0">
     <div class="tab active" data-tab="garden" onclick="switchTab('garden')">🌿 Garden Beds</div>
     <div class="tab" data-tab="almanac" onclick="switchTab('almanac')">📅 Planting Calendar</div>
+    <div class="tab" data-tab="schedule" onclick="switchTab('schedule')">⭐ My Schedule</div>
     <div class="tab" data-tab="indoor" onclick="switchTab('indoor')">🪴 Indoor Plants</div>
   </div>
 
@@ -168,6 +169,29 @@
       <button onclick="filterAlmanac('indoor')" class="almanac-filter text-xs px-3 py-1 rounded-full border">🐱 Indoor</button>
     </div>
     <div id="almanac-table" class="space-y-1 text-sm"></div>
+  </div>
+
+  <!-- ==================== SCHEDULE TAB ==================== -->
+  <div id="tab-schedule" class="tab-content bg-white rounded-b-xl rounded-tr-xl p-6 shadow-sm">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h3 class="font-semibold text-gray-700">⭐ My Planting Schedule</h3>
+        <p class="text-xs text-gray-400 mt-1">Star crops in the Planting Calendar to add them here. Shows upcoming tasks by month.</p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="exportSchedule()" class="text-xs px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition">📋 Copy to Clipboard</button>
+      </div>
+    </div>
+
+    <!-- Current month indicator -->
+    <div id="schedule-now" class="mb-4 p-3 rounded-lg bg-green-50 border border-green-200"></div>
+
+    <!-- Monthly schedule -->
+    <div id="schedule-timeline" class="space-y-3"></div>
+
+    <p id="no-schedule" class="text-center text-sm text-gray-400 italic mt-8 hidden">
+      No crops added yet. Go to the 📅 Planting Calendar and click ⭐ to add favorites!
+    </p>
   </div>
 
   <!-- ==================== INDOOR TAB ==================== -->
@@ -356,11 +380,13 @@ let beds = JSON.parse(localStorage.getItem('garden_beds') || 'null') || [
 ];
 let pots = JSON.parse(localStorage.getItem('garden_pots') || '[]');
 let indoorPlants = JSON.parse(localStorage.getItem('indoor_plants') || '[]');
+let favorites = JSON.parse(localStorage.getItem('garden_favorites') || '[]');
 
 function save() {
   localStorage.setItem('garden_beds', JSON.stringify(beds));
   localStorage.setItem('garden_pots', JSON.stringify(pots));
   localStorage.setItem('indoor_plants', JSON.stringify(indoorPlants));
+  localStorage.setItem('garden_favorites', JSON.stringify(favorites));
 }
 
 // ===== TABS =====
@@ -489,11 +515,12 @@ function renderAlmanac() {
   const filtered = almanacFilter === 'all' ? ALMANAC : ALMANAC.filter(a => a.type === almanacFilter);
 
   // Month headers
-  let html = `<div class="flex items-center gap-0 mb-2 pl-32">
+  let html = `<div class="flex items-center gap-0 mb-2 pl-40">
     ${MONTHS.map(m => `<div class="flex-1 text-center text-xs text-gray-400 font-medium">${m}</div>`).join('')}
   </div>`;
 
   html += filtered.map(plant => {
+    const isFav = favorites.includes(plant.name);
     const bars = MONTHS.map((_, mi) => {
       const m = mi + 1;
       let cls = '';
@@ -504,6 +531,7 @@ function renderAlmanac() {
       return `<div class="flex-1 px-0.5"><div class="month-bar ${cls}" style="height:${cls ? '20px' : '20px'}; ${cls ? '' : 'background:transparent;'}">${''}</div></div>`;
     }).join('');
     return `<div class="flex items-center gap-0 py-1 hover:bg-gray-50 rounded">
+      <button onclick="toggleFavorite('${plant.name}')" class="w-8 shrink-0 text-center text-sm hover:scale-125 transition-transform" title="${isFav ? 'Remove from schedule' : 'Add to schedule'}">${isFav ? '⭐' : '☆'}</button>
       <div class="w-32 shrink-0 text-sm">${plant.emoji} ${plant.name}</div>
       ${bars}
     </div>`;
@@ -515,6 +543,110 @@ function renderAlmanac() {
     const first = document.querySelector('.almanac-filter');
     if (first) { first.style.background = '#2E7D32'; first.style.color = 'white'; }
   }
+}
+
+// ===== SCHEDULE (FAVORITES) =====
+function toggleFavorite(name) {
+  const idx = favorites.indexOf(name);
+  if (idx >= 0) favorites.splice(idx, 1);
+  else favorites.push(name);
+  save(); renderAlmanac(); renderSchedule();
+}
+
+function renderSchedule() {
+  const timeline = document.getElementById('schedule-timeline');
+  const nowEl = document.getElementById('schedule-now');
+  const emptyEl = document.getElementById('no-schedule');
+  
+  if (!favorites.length) {
+    timeline.innerHTML = '';
+    nowEl.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+    return;
+  }
+  emptyEl.classList.add('hidden');
+
+  const currentMonth = new Date().getMonth() + 1; // 1-indexed
+  const favPlants = ALMANAC.filter(p => favorites.includes(p.name));
+
+  // Build tasks per month
+  const schedule = {};
+  for (let m = 1; m <= 12; m++) schedule[m] = [];
+
+  favPlants.forEach(plant => {
+    (plant.indoors || []).forEach(m => schedule[m].push({ plant, action: 'Start Indoors', cls: 'sow-indoor', icon: '🏠' }));
+    (plant.sow || []).forEach(m => schedule[m].push({ plant, action: 'Direct Sow', cls: 'sow-outdoor', icon: '🌱' }));
+    (plant.transplant || []).forEach(m => schedule[m].push({ plant, action: 'Transplant', cls: 'transplant', icon: '🪴' }));
+    (plant.harvest || []).forEach(m => schedule[m].push({ plant, action: 'Harvest', cls: 'harvest', icon: '🧺' }));
+  });
+
+  // Current month summary
+  const thisMonth = schedule[currentMonth];
+  if (thisMonth.length) {
+    nowEl.innerHTML = `
+      <p class="font-semibold text-green-800 text-sm mb-2">📍 This month (${MONTHS[currentMonth - 1]}) — ${thisMonth.length} task${thisMonth.length > 1 ? 's' : ''}</p>
+      <div class="flex flex-wrap gap-2">
+        ${thisMonth.map(t => `<span class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-white border border-green-200 text-green-800">${t.icon} ${t.action}: ${t.plant.emoji} ${t.plant.name}</span>`).join('')}
+      </div>
+    `;
+  } else {
+    nowEl.innerHTML = `<p class="text-sm text-green-700">📍 ${MONTHS[currentMonth - 1]} — Nothing scheduled this month. Relax! 🌿</p>`;
+  }
+
+  // Full 12-month timeline
+  timeline.innerHTML = Array.from({length: 12}, (_, i) => {
+    const m = i + 1;
+    const tasks = schedule[m];
+    const isCurrent = m === currentMonth;
+    const isPast = m < currentMonth;
+    
+    if (!tasks.length) return `
+      <div class="flex items-start gap-3 ${isPast ? 'opacity-40' : ''}">
+        <div class="w-10 text-xs font-medium ${isCurrent ? 'text-green-700' : 'text-gray-400'} pt-1">${MONTHS[i]}</div>
+        <div class="flex-1 border-l-2 ${isCurrent ? 'border-green-400' : 'border-gray-200'} pl-4 py-1">
+          <p class="text-xs text-gray-300 italic">—</p>
+        </div>
+      </div>
+    `;
+
+    return `
+      <div class="flex items-start gap-3 ${isPast ? 'opacity-50' : ''}">
+        <div class="w-10 text-xs font-semibold ${isCurrent ? 'text-green-700' : 'text-gray-600'} pt-1">${MONTHS[i]}${isCurrent ? ' ◀' : ''}</div>
+        <div class="flex-1 border-l-2 ${isCurrent ? 'border-green-400' : 'border-gray-200'} pl-4 py-1 space-y-1">
+          ${tasks.map(t => `
+            <div class="flex items-center gap-2 text-sm">
+              <span class="month-bar ${t.cls} inline-block px-2 py-0.5 rounded text-xs">${t.icon} ${t.action}</span>
+              <span>${t.plant.emoji} ${t.plant.name}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function exportSchedule() {
+  if (!favorites.length) { alert('Add some crops first!'); return; }
+  const favPlants = ALMANAC.filter(p => favorites.includes(p.name));
+  let text = '🌱 NOVA Garden Planting Schedule (Zone 7a)\n\n';
+  
+  for (let m = 1; m <= 12; m++) {
+    const tasks = [];
+    favPlants.forEach(plant => {
+      if (plant.indoors?.includes(m)) tasks.push(`🏠 Start Indoors: ${plant.name}`);
+      if (plant.sow?.includes(m)) tasks.push(`🌱 Direct Sow: ${plant.name}`);
+      if (plant.transplant?.includes(m)) tasks.push(`🪴 Transplant: ${plant.name}`);
+      if (plant.harvest?.includes(m)) tasks.push(`🧺 Harvest: ${plant.name}`);
+    });
+    if (tasks.length) {
+      text += `${MONTHS[m-1]}:\n${tasks.map(t => `  ${t}`).join('\n')}\n\n`;
+    }
+  }
+  navigator.clipboard.writeText(text).then(() => alert('Schedule copied to clipboard!')).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    alert('Schedule copied to clipboard!');
+  });
 }
 
 // ===== INDOOR PLANTS =====
@@ -668,6 +800,7 @@ renderPalette();
 renderBeds();
 renderPots();
 renderAlmanac();
+renderSchedule();
 renderIndoorPlants();
 </script>
 </body>
