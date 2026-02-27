@@ -129,6 +129,10 @@
 
       <!-- Beds -->
       <div class="flex-1 space-y-6">
+        <div class="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm">
+          <span class="font-medium text-amber-800">☀️ Front yard · East-Southeast exposure</span>
+          <span class="text-amber-600 ml-2">— Morning & midday sun, shaded by afternoon. Great for most veggies & herbs.</span>
+        </div>
         <div id="beds-container"></div>
 
         <!-- Pots -->
@@ -168,7 +172,11 @@
   <div id="tab-indoor" class="tab-content bg-white rounded-b-xl rounded-tr-xl p-6 shadow-sm">
     <div class="max-w-2xl mx-auto">
       <h3 class="font-semibold text-gray-700 mb-1">🪴 Indoor Plant Care Guide</h3>
-      <p class="text-sm text-gray-400 mb-4">Upload a photo to identify your plant and get care instructions.</p>
+      <p class="text-sm text-gray-400 mb-2">Upload a photo to identify your plant and get care instructions.</p>
+      <div class="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-100 text-xs text-blue-700">
+        <span class="font-medium">🧭 House orientation: Front = East-Southeast</span><br>
+        Front windows → morning/midday sun (bright, gentle) · Back windows → afternoon sun (hot, intense)
+      </div>
 
       <div id="upload-zone" class="upload-zone mb-6" onclick="document.getElementById('plant-photo').click()">
         <input type="file" id="plant-photo" accept="image/*" class="hidden" onchange="handlePlantUpload(event)">
@@ -285,6 +293,17 @@ const INDOOR_CARE = {
   "aloe vera": { light: "Bright Direct", water: "Every 2-3 weeks", humidity: "Low", difficulty: 1, tip: "Needs well-draining soil. Gel soothes burns. Offsets easily." },
   "orchid": { light: "Bright Indirect", water: "Weekly (ice cube method)", humidity: "High", difficulty: 3, tip: "Don't use soil — bark/moss mix. Cut spent stems above a node for reblooming." },
   "default": { light: "Medium", water: "Check weekly", humidity: "Medium", difficulty: 2, tip: "Research this specific species for best care. When in doubt, underwater rather than overwater." },
+};
+
+// House orientation: front = ESE (East-Southeast), back = WNW (West-Northwest)
+// Front windows: morning/midday sun — bright direct AM, indirect PM
+// Back windows: afternoon/evening sun — hot direct PM light
+const WINDOW_PLACEMENT = {
+  "Bright Direct":     { rec: "🪟 Back windows", reason: "Needs intense afternoon sun — west-facing back windows get strongest direct light" },
+  "Bright Indirect":   { rec: "🪟 Front windows", reason: "Morning sun from ESE front windows is bright but gentler — perfect indirect light" },
+  "Medium":            { rec: "🪟 Front windows", reason: "ESE front windows provide moderate, even light throughout the morning" },
+  "Low-Medium":        { rec: "🪟 Front or back (set back)", reason: "Tolerates low light — any window works, set back a few feet from direct rays" },
+  "Low-Bright":        { rec: "🪟 Any window", reason: "Very adaptable — thrives almost anywhere in the house" },
 };
 
 // ===== STATE =====
@@ -566,6 +585,13 @@ function renderIndoorPlants() {
             <span class="text-xs text-gray-400">Difficulty:</span>
             <div class="flex gap-0.5">${difficultyBars}</div>
           </div>
+          ${(() => {
+            const placement = WINDOW_PLACEMENT[plant.care.light] || WINDOW_PLACEMENT['Medium'];
+            return `<div class="mt-2 p-2 rounded-lg bg-blue-50 border border-blue-200">
+              <p class="text-xs font-medium text-blue-800">${placement.rec}</p>
+              <p class="text-xs text-blue-600">${placement.reason}</p>
+            </div>`;
+          })()}
           <p class="text-xs text-gray-500 mt-2 italic">💡 ${plant.care.tip}</p>
           ${healthHtml}
         </div>
