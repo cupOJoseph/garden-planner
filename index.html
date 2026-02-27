@@ -121,9 +121,10 @@
   <div id="tab-garden" class="tab-content active bg-white rounded-b-xl rounded-tr-xl p-6 shadow-sm">
     <div class="flex flex-col lg:flex-row gap-6">
       <!-- Plant Palette -->
-      <div class="lg:w-56 shrink-0">
+      <div class="w-52 shrink-0">
         <h3 class="font-semibold text-sm mb-2 text-gray-700">🎨 Select a Plant</h3>
-        <div id="palette" class="flex flex-wrap lg:flex-col gap-2 max-h-[500px] overflow-y-auto"></div>
+        <input id="plant-search" type="text" placeholder="Search plants..." oninput="renderPalette()" class="w-full text-sm px-3 py-1.5 rounded-lg border border-gray-200 mb-2 focus:outline-none focus:border-green-400">
+        <div id="palette" class="flex flex-col gap-1.5 max-h-[520px] overflow-y-auto pr-1"></div>
       </div>
 
       <!-- Beds -->
@@ -226,6 +227,8 @@ const PLANTS = [
   { name: "Petunia", emoji: "🩷", type: "flower", companion: ["Tomato", "Pepper"], avoid: [] },
   { name: "Black-eyed Susan", emoji: "🌼", type: "flower", companion: [], avoid: [] },
   { name: "Echinacea", emoji: "🪷", type: "flower", companion: [], avoid: [] },
+  // Fruit
+  { name: "Blueberry", emoji: "🫐", type: "flower", companion: ["Strawberry"], avoid: [] },
 ];
 
 // Zone 7a almanac data (month ranges, 1-indexed)
@@ -260,6 +263,7 @@ const ALMANAC = [
   { name: "Cosmos", emoji: "🌸", type: "flower", indoors: [3,4], sow: [5,6], transplant: [5], harvest: [7,8,9,10] },
   { name: "Echinacea", emoji: "🪷", type: "flower", indoors: [2,3], sow: [4,5], transplant: [5], harvest: [7,8,9] },
   { name: "Black-eyed Susan", emoji: "🌼", type: "flower", indoors: [2,3], sow: [4,5], transplant: [5], harvest: [7,8,9,10] },
+  { name: "Blueberry", emoji: "🫐", type: "flower", indoors: [], sow: [], transplant: [3,4], harvest: [6,7,8] },
 ];
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -302,11 +306,13 @@ function switchTab(tab) {
 // ===== PALETTE =====
 function renderPalette() {
   const el = document.getElementById('palette');
-  el.innerHTML = PLANTS.map(p => `
+  const query = (document.getElementById('plant-search')?.value || '').toLowerCase();
+  const filtered = query ? PLANTS.filter(p => p.name.toLowerCase().includes(query) || p.type.includes(query)) : PLANTS;
+  el.innerHTML = filtered.map(p => `
     <div class="plant-option ${selectedPlant?.name === p.name ? 'selected' : ''}" onclick="selectPlant('${p.name}')">
       ${p.emoji} ${p.name}
     </div>
-  `).join('');
+  `).join('') || '<p class="text-xs text-gray-400 italic px-1">No matches</p>';
 }
 
 function selectPlant(name) {
