@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NOVA Garden Planner 🌱</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
+    :root {
+      --soil: #3E2723;
+      --soil-light: #5D4037;
+      --leaf: #2E7D32;
+      --leaf-light: #4CAF50;
+      --sky: #E3F2FD;
+      --sun: #FFB300;
+      --terracotta: #BF360C;
+      --water: #0288D1;
+      --bloom: #E91E63;
+      --herb: #7CB342;
+    }
+    body { font-family: 'Inter', sans-serif; background: var(--sky); min-height: 100vh; }
+    
+    /* Tabs */
+    .tab { cursor: pointer; padding: 0.75rem 1.5rem; border-radius: 0.75rem 0.75rem 0 0; transition: all 0.2s; }
+    .tab.active { background: white; color: var(--leaf); font-weight: 600; box-shadow: 0 -2px 8px rgba(0,0,0,0.08); }
+    .tab:not(.active) { background: rgba(255,255,255,0.5); color: #666; }
+    .tab:not(.active):hover { background: rgba(255,255,255,0.8); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Garden Grid */
+    .bed-grid {
+      display: grid;
+      gap: 2px;
+      background: var(--soil);
+      border: 3px solid var(--soil-light);
+      border-radius: 8px;
+      padding: 2px;
+    }
+    .bed-cell {
+      width: 48px; height: 48px;
+      background: #6D4C41;
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 1.4rem;
+      position: relative;
+    }
+    .bed-cell:hover { background: #8D6E63; transform: scale(1.05); }
+    .bed-cell.planted { background: #4E342E; }
+    .bed-cell .remove-plant {
+      display: none; position: absolute; top: -4px; right: -4px;
+      background: #ef4444; color: white; border-radius: 50%;
+      width: 16px; height: 16px; font-size: 10px; line-height: 16px; text-align: center;
+      cursor: pointer;
+    }
+    .bed-cell:hover .remove-plant { display: block; }
+
+    /* Pot */
+    .pot {
+      width: 80px; background: linear-gradient(180deg, var(--terracotta) 0%, #8B4513 100%);
+      border-radius: 4px 4px 12px 12px; padding: 8px; text-align: center;
+      cursor: pointer; transition: all 0.2s; position: relative;
+    }
+    .pot:hover { transform: scale(1.05); }
+    .pot-rim { height: 6px; background: #D84315; border-radius: 4px 4px 0 0; margin: -8px -8px 6px -8px; }
+    .pot .remove-pot {
+      display: none; position: absolute; top: -6px; right: -6px;
+      background: #ef4444; color: white; border-radius: 50%;
+      width: 18px; height: 18px; font-size: 11px; line-height: 18px; text-align: center; cursor: pointer;
+    }
+    .pot:hover .remove-pot { display: block; }
+
+    /* Plant palette */
+    .plant-option {
+      cursor: grab; padding: 6px 10px; border-radius: 8px; background: white;
+      border: 2px solid #e5e7eb; transition: all 0.15s; user-select: none; font-size: 0.85rem;
+    }
+    .plant-option:hover { border-color: var(--leaf-light); background: #f0fdf4; }
+    .plant-option.selected { border-color: var(--leaf); background: #dcfce7; box-shadow: 0 0 0 2px rgba(46,125,50,0.2); }
+
+    /* Almanac */
+    .month-bar { height: 24px; border-radius: 4px; font-size: 0.7rem; color: white; display: flex; align-items: center; padding: 0 6px; font-weight: 500; }
+    .sow-indoor { background: #7B1FA2; }
+    .sow-outdoor { background: var(--leaf); }
+    .transplant { background: var(--water); }
+    .harvest { background: var(--sun); color: #333; }
+
+    /* Indoor plants */
+    .upload-zone {
+      border: 2px dashed #ccc; border-radius: 12px; padding: 2rem; text-align: center;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .upload-zone:hover, .upload-zone.dragover { border-color: var(--leaf); background: #f0fdf4; }
+    .plant-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .care-meter { height: 8px; border-radius: 4px; background: #e5e7eb; overflow: hidden; }
+    .care-meter-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+  </style>
+</head>
+<body>
+
+<div class="max-w-6xl mx-auto px-4 py-6">
+  <!-- Header -->
+  <div class="text-center mb-6">
+    <h1 class="text-3xl font-bold" style="font-family: 'Playfair Display', serif; color: var(--leaf);">
+      🌱 NOVA Garden Planner
+    </h1>
+    <p class="text-sm text-gray-500 mt-1">Zone 7a · Northern Virginia · Farmers' Almanac Built In</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap-1 mb-0">
+    <div class="tab active" data-tab="garden" onclick="switchTab('garden')">🌿 Garden Beds</div>
+    <div class="tab" data-tab="almanac" onclick="switchTab('almanac')">📅 Planting Calendar</div>
+    <div class="tab" data-tab="indoor" onclick="switchTab('indoor')">🪴 Indoor Plants</div>
+  </div>
+
+  <!-- ==================== GARDEN TAB ==================== -->
+  <div id="tab-garden" class="tab-content active bg-white rounded-b-xl rounded-tr-xl p-6 shadow-sm">
+    <div class="flex flex-col lg:flex-row gap-6">
+      <!-- Plant Palette -->
+      <div class="lg:w-56 shrink-0">
+        <h3 class="font-semibold text-sm mb-2 text-gray-700">🎨 Select a Plant</h3>
+        <div id="palette" class="flex flex-wrap lg:flex-col gap-2 max-h-[500px] overflow-y-auto"></div>
+      </div>
+
+      <!-- Beds -->
+      <div class="flex-1 space-y-6">
+        <div id="beds-container"></div>
+
+        <!-- Pots -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold text-gray-700">🪴 Pots</h3>
+            <button onclick="addPot()" class="text-sm px-3 py-1 rounded-full bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition">+ Add Pot</button>
+          </div>
+          <div id="pots-container" class="flex flex-wrap gap-4"></div>
+          <p id="no-pots" class="text-sm text-gray-400 italic">No pots yet. Click "Add Pot" to start.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== ALMANAC TAB ==================== -->
+  <div id="tab-almanac" class="tab-content bg-white rounded-b-xl rounded-tr-xl p-6 shadow-sm">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-semibold text-gray-700">📅 Zone 7a Planting Calendar — Northern Virginia</h3>
+      <div class="flex gap-3 text-xs">
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded sow-indoor inline-block"></span> Start Indoors</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded sow-outdoor inline-block"></span> Direct Sow</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded transplant inline-block"></span> Transplant</span>
+        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded harvest inline-block"></span> Harvest</span>
+      </div>
+    </div>
+    <div class="flex gap-2 mb-4">
+      <button onclick="filterAlmanac('all')" class="almanac-filter active text-xs px-3 py-1 rounded-full border">All</button>
+      <button onclick="filterAlmanac('vegetable')" class="almanac-filter text-xs px-3 py-1 rounded-full border">🥬 Vegetables</button>
+      <button onclick="filterAlmanac('herb')" class="almanac-filter text-xs px-3 py-1 rounded-full border">🌿 Herbs</button>
+      <button onclick="filterAlmanac('flower')" class="almanac-filter text-xs px-3 py-1 rounded-full border">🌸 Flowers</button>
+    </div>
+    <div id="almanac-table" class="space-y-1 text-sm"></div>
+  </div>
+
+  <!-- ==================== INDOOR TAB ==================== -->
+  <div id="tab-indoor" class="tab-content bg-white rounded-b-xl rounded-tr-xl p-6 shadow-sm">
+    <div class="max-w-2xl mx-auto">
+      <h3 class="font-semibold text-gray-700 mb-1">🪴 Indoor Plant Care Guide</h3>
+      <p class="text-sm text-gray-400 mb-4">Upload a photo to identify your plant and get care instructions.</p>
+
+      <div id="upload-zone" class="upload-zone mb-6" onclick="document.getElementById('plant-photo').click()">
+        <input type="file" id="plant-photo" accept="image/*" class="hidden" onchange="handlePlantUpload(event)">
+        <div class="text-4xl mb-2">📸</div>
+        <p class="text-gray-500">Click or drag a photo of your plant here</p>
+        <p class="text-xs text-gray-400 mt-1">Supports JPG, PNG · Plant.id API key required for auto-ID</p>
+      </div>
+
+      <!-- API Key -->
+      <div class="mb-6 p-3 bg-amber-50 rounded-lg border border-amber-200">
+        <label class="text-xs font-medium text-amber-800 block mb-1">🔑 Plant.id API Key <span class="font-normal">(free at <a href="https://web.plant.id/plant-identification-api/" target="_blank" class="underline">plant.id</a>)</span></label>
+        <input id="plantid-key" type="text" placeholder="Paste your API key here..." class="w-full text-sm px-3 py-1.5 rounded border border-amber-300 bg-white" oninput="localStorage.setItem('plantid_key', this.value)">
+      </div>
+
+      <!-- Identified plants -->
+      <div id="indoor-plants" class="space-y-4"></div>
+      <p id="no-indoor" class="text-sm text-gray-400 italic text-center">No plants added yet. Upload a photo to get started!</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== DATA =====
+const PLANTS = [
+  // Vegetables
+  { name: "Tomato", emoji: "🍅", type: "vegetable", companion: ["Basil", "Carrot"], avoid: ["Cabbage"] },
+  { name: "Pepper", emoji: "🌶️", type: "vegetable", companion: ["Basil", "Tomato"], avoid: ["Fennel"] },
+  { name: "Lettuce", emoji: "🥬", type: "vegetable", companion: ["Carrot", "Radish"], avoid: ["Celery"] },
+  { name: "Carrot", emoji: "🥕", type: "vegetable", companion: ["Tomato", "Lettuce"], avoid: ["Dill"] },
+  { name: "Cucumber", emoji: "🥒", type: "vegetable", companion: ["Bean", "Pea"], avoid: ["Sage"] },
+  { name: "Zucchini", emoji: "🫒", type: "vegetable", companion: ["Bean", "Corn"], avoid: ["Potato"] },
+  { name: "Bean", emoji: "🫘", type: "vegetable", companion: ["Corn", "Cucumber"], avoid: ["Onion"] },
+  { name: "Corn", emoji: "🌽", type: "vegetable", companion: ["Bean", "Zucchini"], avoid: ["Tomato"] },
+  { name: "Pea", emoji: "🟢", type: "vegetable", companion: ["Carrot", "Radish"], avoid: ["Onion"] },
+  { name: "Radish", emoji: "🔴", type: "vegetable", companion: ["Lettuce", "Pea"], avoid: [] },
+  { name: "Spinach", emoji: "🥗", type: "vegetable", companion: ["Strawberry", "Pea"], avoid: [] },
+  { name: "Kale", emoji: "🥦", type: "vegetable", companion: ["Bean", "Onion"], avoid: ["Strawberry"] },
+  { name: "Onion", emoji: "🧅", type: "vegetable", companion: ["Carrot", "Lettuce"], avoid: ["Bean", "Pea"] },
+  { name: "Garlic", emoji: "🧄", type: "vegetable", companion: ["Tomato", "Pepper"], avoid: ["Bean"] },
+  { name: "Potato", emoji: "🥔", type: "vegetable", companion: ["Bean", "Corn"], avoid: ["Tomato"] },
+  // Herbs
+  { name: "Basil", emoji: "🌿", type: "herb", companion: ["Tomato", "Pepper"], avoid: ["Sage"] },
+  { name: "Cilantro", emoji: "🍃", type: "herb", companion: ["Tomato", "Spinach"], avoid: [] },
+  { name: "Mint", emoji: "🌱", type: "herb", companion: ["Tomato", "Cabbage"], avoid: [] },
+  { name: "Rosemary", emoji: "🪻", type: "herb", companion: ["Bean", "Carrot"], avoid: [] },
+  { name: "Thyme", emoji: "🌾", type: "herb", companion: ["Tomato", "Eggplant"], avoid: [] },
+  { name: "Dill", emoji: "🌿", type: "herb", companion: ["Cucumber", "Lettuce"], avoid: ["Carrot"] },
+  { name: "Parsley", emoji: "☘️", type: "herb", companion: ["Tomato", "Corn"], avoid: [] },
+  // Flowers
+  { name: "Marigold", emoji: "🏵️", type: "flower", companion: ["Tomato", "Pepper"], avoid: [] },
+  { name: "Sunflower", emoji: "🌻", type: "flower", companion: ["Corn", "Cucumber"], avoid: ["Potato"] },
+  { name: "Zinnia", emoji: "🌺", type: "flower", companion: ["Tomato", "Pepper"], avoid: [] },
+  { name: "Nasturtium", emoji: "🧡", type: "flower", companion: ["Cucumber", "Zucchini"], avoid: [] },
+  { name: "Lavender", emoji: "💜", type: "flower", companion: ["Rosemary", "Thyme"], avoid: [] },
+  { name: "Cosmos", emoji: "🌸", type: "flower", companion: ["Tomato", "Bean"], avoid: [] },
+  { name: "Petunia", emoji: "🩷", type: "flower", companion: ["Tomato", "Pepper"], avoid: [] },
+  { name: "Black-eyed Susan", emoji: "🌼", type: "flower", companion: [], avoid: [] },
+  { name: "Echinacea", emoji: "🪷", type: "flower", companion: [], avoid: [] },
+];
+
+// Zone 7a almanac data (month ranges, 1-indexed)
+const ALMANAC = [
+  { name: "Tomato", emoji: "🍅", type: "vegetable", indoors: [2,3], sow: [5,6], transplant: [4,5], harvest: [7,8,9,10] },
+  { name: "Pepper", emoji: "🌶️", type: "vegetable", indoors: [2,3], sow: [], transplant: [5,6], harvest: [7,8,9,10] },
+  { name: "Lettuce", emoji: "🥬", type: "vegetable", indoors: [2], sow: [3,4,8,9], transplant: [3,4], harvest: [4,5,6,10,11] },
+  { name: "Carrot", emoji: "🥕", type: "vegetable", indoors: [], sow: [3,4,7,8], transplant: [], harvest: [6,7,10,11] },
+  { name: "Cucumber", emoji: "🥒", type: "vegetable", indoors: [3,4], sow: [5,6], transplant: [5], harvest: [6,7,8,9] },
+  { name: "Zucchini", emoji: "🫒", type: "vegetable", indoors: [4], sow: [5,6], transplant: [5], harvest: [6,7,8,9] },
+  { name: "Bean", emoji: "🫘", type: "vegetable", indoors: [], sow: [4,5,6,7], transplant: [], harvest: [6,7,8,9] },
+  { name: "Corn", emoji: "🌽", type: "vegetable", indoors: [], sow: [4,5], transplant: [], harvest: [7,8,9] },
+  { name: "Pea", emoji: "🟢", type: "vegetable", indoors: [], sow: [2,3,8,9], transplant: [], harvest: [5,6,10,11] },
+  { name: "Radish", emoji: "🔴", type: "vegetable", indoors: [], sow: [3,4,8,9], transplant: [], harvest: [4,5,9,10] },
+  { name: "Spinach", emoji: "🥗", type: "vegetable", indoors: [], sow: [2,3,9,10], transplant: [], harvest: [4,5,10,11] },
+  { name: "Kale", emoji: "🥦", type: "vegetable", indoors: [2,3], sow: [3,4,8,9], transplant: [4], harvest: [5,6,10,11,12] },
+  { name: "Onion", emoji: "🧅", type: "vegetable", indoors: [1,2], sow: [3,4], transplant: [3,4], harvest: [6,7,8] },
+  { name: "Garlic", emoji: "🧄", type: "vegetable", indoors: [], sow: [10,11], transplant: [], harvest: [6,7] },
+  { name: "Potato", emoji: "🥔", type: "vegetable", indoors: [], sow: [3,4], transplant: [], harvest: [6,7,8] },
+  { name: "Basil", emoji: "🌿", type: "herb", indoors: [3,4], sow: [5,6], transplant: [5], harvest: [6,7,8,9,10] },
+  { name: "Cilantro", emoji: "🍃", type: "herb", indoors: [], sow: [3,4,9], transplant: [], harvest: [5,6,10,11] },
+  { name: "Mint", emoji: "🌱", type: "herb", indoors: [2,3], sow: [4,5], transplant: [4,5], harvest: [5,6,7,8,9,10] },
+  { name: "Rosemary", emoji: "🪻", type: "herb", indoors: [2,3], sow: [], transplant: [4,5], harvest: [1,2,3,4,5,6,7,8,9,10,11,12] },
+  { name: "Dill", emoji: "🌿", type: "herb", indoors: [], sow: [4,5,8], transplant: [], harvest: [6,7,8,9,10] },
+  { name: "Parsley", emoji: "☘️", type: "herb", indoors: [2,3], sow: [4,5], transplant: [4], harvest: [5,6,7,8,9,10,11] },
+  { name: "Thyme", emoji: "🌾", type: "herb", indoors: [2,3], sow: [], transplant: [4,5], harvest: [1,2,3,4,5,6,7,8,9,10,11,12] },
+  { name: "Marigold", emoji: "🏵️", type: "flower", indoors: [3,4], sow: [5,6], transplant: [5], harvest: [6,7,8,9,10] },
+  { name: "Sunflower", emoji: "🌻", type: "flower", indoors: [3,4], sow: [4,5,6], transplant: [], harvest: [7,8,9,10] },
+  { name: "Zinnia", emoji: "🌺", type: "flower", indoors: [3,4], sow: [5,6], transplant: [5], harvest: [6,7,8,9,10] },
+  { name: "Nasturtium", emoji: "🧡", type: "flower", indoors: [], sow: [4,5], transplant: [], harvest: [6,7,8,9,10] },
+  { name: "Lavender", emoji: "💜", type: "flower", indoors: [2,3], sow: [], transplant: [4,5], harvest: [6,7,8] },
+  { name: "Cosmos", emoji: "🌸", type: "flower", indoors: [3,4], sow: [5,6], transplant: [5], harvest: [7,8,9,10] },
+  { name: "Echinacea", emoji: "🪷", type: "flower", indoors: [2,3], sow: [4,5], transplant: [5], harvest: [7,8,9] },
+  { name: "Black-eyed Susan", emoji: "🌼", type: "flower", indoors: [2,3], sow: [4,5], transplant: [5], harvest: [7,8,9,10] },
+];
+
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+const INDOOR_CARE = {
+  "pothos": { light: "Low-Medium", water: "Weekly", humidity: "Low", difficulty: 1, tip: "Extremely hardy. Let soil dry between waterings. Trim to encourage bushiness." },
+  "monstera": { light: "Bright Indirect", water: "Weekly", humidity: "Medium", difficulty: 2, tip: "Rotate quarterly. Fenestrations develop with more light. Support with moss pole." },
+  "snake plant": { light: "Low-Bright", water: "Every 2-3 weeks", humidity: "Low", difficulty: 1, tip: "Nearly indestructible. Overwatering is the #1 killer. Great air purifier." },
+  "fiddle leaf fig": { light: "Bright Indirect", water: "Weekly", humidity: "Medium-High", difficulty: 4, tip: "Hates drafts and moving. Water when top 2 inches dry. Wipe leaves monthly." },
+  "peace lily": { light: "Low-Medium", water: "Weekly", humidity: "Medium", difficulty: 2, tip: "Droops dramatically when thirsty. Toxic to pets. Blooms in low light." },
+  "spider plant": { light: "Bright Indirect", water: "Weekly", humidity: "Low", difficulty: 1, tip: "Propagate babies easily. Browning tips = fluoride in water, use filtered." },
+  "rubber plant": { light: "Bright Indirect", water: "Every 1-2 weeks", humidity: "Medium", difficulty: 2, tip: "Wipe glossy leaves to maximize light absorption. Prune for bushiness." },
+  "aloe vera": { light: "Bright Direct", water: "Every 2-3 weeks", humidity: "Low", difficulty: 1, tip: "Needs well-draining soil. Gel soothes burns. Offsets easily." },
+  "orchid": { light: "Bright Indirect", water: "Weekly (ice cube method)", humidity: "High", difficulty: 3, tip: "Don't use soil — bark/moss mix. Cut spent stems above a node for reblooming." },
+  "default": { light: "Medium", water: "Check weekly", humidity: "Medium", difficulty: 2, tip: "Research this specific species for best care. When in doubt, underwater rather than overwater." },
+};
+
+// ===== STATE =====
+let selectedPlant = null;
+let beds = JSON.parse(localStorage.getItem('garden_beds') || 'null') || [
+  { name: "Bed 1", rows: 4, cols: 8, cells: {} },
+  { name: "Bed 2", rows: 4, cols: 8, cells: {} },
+  { name: "Bed 3", rows: 3, cols: 6, cells: {} },
+];
+let pots = JSON.parse(localStorage.getItem('garden_pots') || '[]');
+let indoorPlants = JSON.parse(localStorage.getItem('indoor_plants') || '[]');
+
+function save() {
+  localStorage.setItem('garden_beds', JSON.stringify(beds));
+  localStorage.setItem('garden_pots', JSON.stringify(pots));
+  localStorage.setItem('indoor_plants', JSON.stringify(indoorPlants));
+}
+
+// ===== TABS =====
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.toggle('active', t.id === `tab-${tab}`));
+}
+
+// ===== PALETTE =====
+function renderPalette() {
+  const el = document.getElementById('palette');
+  el.innerHTML = PLANTS.map(p => `
+    <div class="plant-option ${selectedPlant?.name === p.name ? 'selected' : ''}" onclick="selectPlant('${p.name}')">
+      ${p.emoji} ${p.name}
+    </div>
+  `).join('');
+}
+
+function selectPlant(name) {
+  if (selectedPlant?.name === name) { selectedPlant = null; }
+  else { selectedPlant = PLANTS.find(p => p.name === name); }
+  renderPalette();
+}
+
+// ===== BEDS =====
+function renderBeds() {
+  const container = document.getElementById('beds-container');
+  container.innerHTML = beds.map((bed, bi) => {
+    const gridCols = `grid-template-columns: repeat(${bed.cols}, 48px)`;
+    const cells = Array.from({length: bed.rows * bed.cols}, (_, i) => {
+      const key = `${i}`;
+      const plant = bed.cells[key];
+      const p = plant ? PLANTS.find(pp => pp.name === plant) : null;
+      return `<div class="bed-cell ${p ? 'planted' : ''}" onclick="clickCell(${bi}, ${i})" title="${p ? p.name : 'Empty'}">
+        ${p ? p.emoji : ''}
+        ${p ? `<span class="remove-plant" onclick="event.stopPropagation(); removeCell(${bi}, ${i})">×</span>` : ''}
+      </div>`;
+    }).join('');
+    return `
+      <div class="mb-4">
+        <div class="flex items-center gap-3 mb-2">
+          <h3 class="font-semibold text-gray-700">${bed.name}</h3>
+          <span class="text-xs text-gray-400">${bed.cols}×${bed.rows} · ${Object.keys(bed.cells).length} planted</span>
+          <button onclick="resizeBed(${bi})" class="text-xs text-blue-500 hover:underline">Resize</button>
+        </div>
+        <div class="bed-grid inline-grid" style="${gridCols}">${cells}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function clickCell(bi, ci) {
+  if (!selectedPlant) return;
+  const key = `${ci}`;
+  if (beds[bi].cells[key]) { delete beds[bi].cells[key]; }
+  else { beds[bi].cells[key] = selectedPlant.name; }
+  save(); renderBeds();
+}
+
+function removeCell(bi, ci) {
+  delete beds[bi].cells[`${ci}`];
+  save(); renderBeds();
+}
+
+function resizeBed(bi) {
+  const cols = prompt(`Columns for ${beds[bi].name}:`, beds[bi].cols);
+  const rows = prompt(`Rows for ${beds[bi].name}:`, beds[bi].rows);
+  if (cols && rows) {
+    beds[bi].cols = Math.min(Math.max(parseInt(cols), 2), 16);
+    beds[bi].rows = Math.min(Math.max(parseInt(rows), 2), 12);
+    save(); renderBeds();
+  }
+}
+
+// ===== POTS =====
+function renderPots() {
+  const container = document.getElementById('pots-container');
+  document.getElementById('no-pots').style.display = pots.length ? 'none' : 'block';
+  container.innerHTML = pots.map((pot, i) => {
+    const p = pot.plant ? PLANTS.find(pp => pp.name === pot.plant) : null;
+    return `<div class="pot" onclick="clickPot(${i})">
+      <div class="pot-rim"></div>
+      <div class="text-2xl mb-1">${p ? p.emoji : '➕'}</div>
+      <div class="text-xs text-white/80 truncate">${p ? p.name : 'Empty'}</div>
+      <span class="remove-pot" onclick="event.stopPropagation(); removePot(${i})">×</span>
+    </div>`;
+  }).join('');
+}
+
+function addPot() {
+  pots.push({ plant: null });
+  save(); renderPots();
+}
+
+function clickPot(i) {
+  if (!selectedPlant) { alert("Select a plant from the palette first!"); return; }
+  pots[i].plant = pots[i].plant === selectedPlant.name ? null : selectedPlant.name;
+  save(); renderPots();
+}
+
+function removePot(i) {
+  pots.splice(i, 1);
+  save(); renderPots();
+}
+
+// ===== ALMANAC =====
+let almanacFilter = 'all';
+
+function filterAlmanac(type) {
+  almanacFilter = type;
+  document.querySelectorAll('.almanac-filter').forEach(b => {
+    b.classList.toggle('active', false);
+    b.style.background = '';
+    b.style.color = '';
+  });
+  event.target.classList.add('active');
+  event.target.style.background = '#2E7D32';
+  event.target.style.color = 'white';
+  renderAlmanac();
+}
+
+function renderAlmanac() {
+  const el = document.getElementById('almanac-table');
+  const filtered = almanacFilter === 'all' ? ALMANAC : ALMANAC.filter(a => a.type === almanacFilter);
+
+  // Month headers
+  let html = `<div class="flex items-center gap-0 mb-2 pl-32">
+    ${MONTHS.map(m => `<div class="flex-1 text-center text-xs text-gray-400 font-medium">${m}</div>`).join('')}
+  </div>`;
+
+  html += filtered.map(plant => {
+    const bars = MONTHS.map((_, mi) => {
+      const m = mi + 1;
+      let cls = '';
+      if (plant.indoors?.includes(m)) cls = 'sow-indoor';
+      else if (plant.transplant?.includes(m)) cls = 'transplant';
+      else if (plant.sow?.includes(m)) cls = 'sow-outdoor';
+      else if (plant.harvest?.includes(m)) cls = 'harvest';
+      return `<div class="flex-1 px-0.5"><div class="month-bar ${cls}" style="height:${cls ? '20px' : '20px'}; ${cls ? '' : 'background:transparent;'}">${''}</div></div>`;
+    }).join('');
+    return `<div class="flex items-center gap-0 py-1 hover:bg-gray-50 rounded">
+      <div class="w-32 shrink-0 text-sm">${plant.emoji} ${plant.name}</div>
+      ${bars}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = html;
+  // Set first filter button active
+  if (!document.querySelector('.almanac-filter.active')?.style.background) {
+    const first = document.querySelector('.almanac-filter');
+    if (first) { first.style.background = '#2E7D32'; first.style.color = 'white'; }
+  }
+}
+
+// ===== INDOOR PLANTS =====
+function handlePlantUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async function(ev) {
+    const imgData = ev.target.result;
+    const apiKey = document.getElementById('plantid-key').value || localStorage.getItem('plantid_key');
+
+    let identification = null;
+    let healthAssessment = null;
+
+    if (apiKey) {
+      try {
+        // Plant.id v3 API - identification + health
+        const base64 = imgData.split(',')[1];
+        const resp = await fetch('https://plant.id/api/v3/identification', {
+          method: 'POST',
+          headers: { 'Api-Key': apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            images: [base64],
+            health: 'all',
+            similar_images: true,
+          })
+        });
+        const data = await resp.json();
+        if (data.result?.classification?.suggestions?.length) {
+          identification = data.result.classification.suggestions[0];
+        }
+        if (data.result?.disease?.suggestions?.length) {
+          healthAssessment = data.result.disease.suggestions.filter(d => d.probability > 0.1);
+        }
+      } catch (err) {
+        console.error('Plant.id error:', err);
+      }
+    }
+
+    const plantName = identification ? identification.name : prompt('Plant name (auto-ID needs API key):') || 'Unknown Plant';
+    const commonName = (plantName || '').toLowerCase();
+
+    // Find care info
+    let care = INDOOR_CARE['default'];
+    for (const [key, val] of Object.entries(INDOOR_CARE)) {
+      if (commonName.includes(key)) { care = val; break; }
+    }
+
+    const newPlant = {
+      id: Date.now(),
+      name: plantName,
+      scientificName: identification?.details?.taxonomy?.genus || '',
+      image: imgData,
+      care: care,
+      health: healthAssessment,
+      probability: identification?.probability,
+      addedDate: new Date().toLocaleDateString(),
+    };
+
+    indoorPlants.unshift(newPlant);
+    save();
+    renderIndoorPlants();
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
+function renderIndoorPlants() {
+  const container = document.getElementById('indoor-plants');
+  document.getElementById('no-indoor').style.display = indoorPlants.length ? 'none' : 'block';
+
+  container.innerHTML = indoorPlants.map(plant => {
+    const difficultyBars = Array.from({length: 5}, (_, i) =>
+      `<div class="w-2 h-4 rounded-sm ${i < plant.care.difficulty ? 'bg-green-500' : 'bg-gray-200'}"></div>`
+    ).join('');
+
+    const healthHtml = plant.health?.length ? `
+      <div class="mt-3 p-2 rounded-lg ${plant.health.some(h => h.probability > 0.5) ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'}">
+        <p class="text-xs font-medium ${plant.health.some(h => h.probability > 0.5) ? 'text-red-700' : 'text-green-700'} mb-1">
+          ${plant.health.some(h => h.probability > 0.5) ? '⚠️ Health Issues Detected' : '✅ Plant looks healthy!'}
+        </p>
+        ${plant.health.filter(h => h.probability > 0.3).map(h => `
+          <p class="text-xs text-gray-600">• ${h.name} (${Math.round(h.probability * 100)}%)</p>
+        `).join('')}
+      </div>
+    ` : '';
+
+    return `
+      <div class="plant-card flex flex-col sm:flex-row">
+        <div class="sm:w-40 h-40 sm:h-auto shrink-0">
+          <img src="${plant.image}" class="w-full h-full object-cover" alt="${plant.name}">
+        </div>
+        <div class="p-4 flex-1">
+          <div class="flex items-start justify-between">
+            <div>
+              <h4 class="font-semibold text-gray-800">${plant.name}</h4>
+              ${plant.scientificName ? `<p class="text-xs text-gray-400 italic">${plant.scientificName}</p>` : ''}
+              ${plant.probability ? `<p class="text-xs text-green-600">${Math.round(plant.probability * 100)}% confidence</p>` : ''}
+            </div>
+            <button onclick="removeIndoor(${plant.id})" class="text-gray-300 hover:text-red-500 text-lg">×</button>
+          </div>
+          <div class="grid grid-cols-3 gap-3 mt-3">
+            <div><p class="text-xs text-gray-400">Light</p><p class="text-sm font-medium">☀️ ${plant.care.light}</p></div>
+            <div><p class="text-xs text-gray-400">Water</p><p class="text-sm font-medium">💧 ${plant.care.water}</p></div>
+            <div><p class="text-xs text-gray-400">Humidity</p><p class="text-sm font-medium">💨 ${plant.care.humidity}</p></div>
+          </div>
+          <div class="flex items-center gap-2 mt-2">
+            <span class="text-xs text-gray-400">Difficulty:</span>
+            <div class="flex gap-0.5">${difficultyBars}</div>
+          </div>
+          <p class="text-xs text-gray-500 mt-2 italic">💡 ${plant.care.tip}</p>
+          ${healthHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function removeIndoor(id) {
+  indoorPlants = indoorPlants.filter(p => p.id !== id);
+  save(); renderIndoorPlants();
+}
+
+// ===== DRAG & DROP for upload zone =====
+const uploadZone = document.getElementById('upload-zone');
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault(); uploadZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    const input = document.getElementById('plant-photo');
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    handlePlantUpload({ target: input });
+  }
+});
+
+// ===== INIT =====
+document.getElementById('plantid-key').value = localStorage.getItem('plantid_key') || '';
+renderPalette();
+renderBeds();
+renderPots();
+renderAlmanac();
+renderIndoorPlants();
+</script>
+</body>
+</html>
