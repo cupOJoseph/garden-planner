@@ -190,12 +190,15 @@
     <div class="flex items-center justify-between mb-4">
       <div>
         <h3 class="font-semibold text-gray-700">⭐ My Planting Schedule</h3>
-        <p class="text-xs text-gray-400 mt-1">Star crops in the Planting Calendar to add them here. Shows upcoming tasks by month.</p>
+        <p class="text-xs text-gray-400 mt-1">Star crops in the Planting Calendar, then mark each as indoor or outdoor. Indoor crops skip transplant tasks.</p>
       </div>
       <div class="flex gap-2">
         <button onclick="exportSchedule()" class="text-xs px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition">📋 Copy to Clipboard</button>
       </div>
     </div>
+
+    <!-- My crops list with indoor/outdoor toggles -->
+    <div id="schedule-crops" class="mb-5"></div>
 
     <!-- Current month indicator -->
     <div id="schedule-now" class="mb-4 p-3 rounded-lg bg-green-50 border border-green-200"></div>
@@ -395,7 +398,12 @@ let beds = JSON.parse(localStorage.getItem('garden_beds') || 'null') || [
 let pots = JSON.parse(localStorage.getItem('garden_pots') || '[]');
 let indoorPlants = JSON.parse(localStorage.getItem('indoor_plants') || '[]');
 let favorites = JSON.parse(localStorage.getItem('garden_favorites') || '[]');
-let savedTasks = JSON.parse(localStorage.getItem('garden_tasks') || '[]'); // "PlantName|action|month"
+// Migrate old string favorites to objects: {name, setting: 'outdoor'|'indoor'}
+if (favorites.length && typeof favorites[0] === 'string') {
+  favorites = favorites.map(f => ({ name: f, setting: 'outdoor' }));
+  localStorage.setItem('garden_favorites', JSON.stringify(favorites));
+}
+let savedTasks = JSON.parse(localStorage.getItem('garden_tasks') || '[]');
 
 function save() {
   localStorage.setItem('garden_beds', JSON.stringify(beds));
@@ -563,7 +571,7 @@ function renderAlmanac() {
   </div>`;
 
   html += filtered.map(plant => {
-    const isFav = favorites.includes(plant.name);
+    const isFav = favorites.some(f => f.name === plant.name);
     const bars = MONTHS.map((_, mi) => {
       const m = mi + 1;
       let cls = '';
@@ -609,8 +617,8 @@ function toggleTask(name, action, month) {
   else savedTasks.push(key);
   // Update favorites list (for star display)
   const hasAnyTask = savedTasks.some(t => t.startsWith(name + '|'));
-  const favIdx = favorites.indexOf(name);
-  if (hasAnyTask && favIdx < 0) favorites.push(name);
+  const favIdx = favorites.findIndex(f => f.name === name);
+  if (hasAnyTask && favIdx < 0) favorites.push({ name, setting: 'outdoor' });
   if (!hasAnyTask && favIdx >= 0) favorites.splice(favIdx, 1);
   save(); renderAlmanac(); renderSchedule();
 }
@@ -620,7 +628,7 @@ function toggleAllFavorite(name) {
   if (existing.length) {
     // Remove all tasks for this plant
     savedTasks = savedTasks.filter(t => !t.startsWith(name + '|'));
-    favorites = favorites.filter(f => f !== name);
+    favorites = favorites.filter(f => f.name !== name);
   } else {
     // Add ALL tasks for this plant
     const plant = ALMANAC.find(p => p.name === name);
@@ -629,17 +637,41 @@ function toggleAllFavorite(name) {
     (plant.sow || []).forEach(m => { const k = `${name}|sow|${m}`; if (!savedTasks.includes(k)) savedTasks.push(k); });
     (plant.transplant || []).forEach(m => { const k = `${name}|transplant|${m}`; if (!savedTasks.includes(k)) savedTasks.push(k); });
     (plant.harvest || []).forEach(m => { const k = `${name}|harvest|${m}`; if (!savedTasks.includes(k)) savedTasks.push(k); });
-    if (!favorites.includes(name)) favorites.push(name);
+    if (!favorites.some(f => f.name === name)) favorites.push({ name, setting: 'outdoor' });
   }
   save(); renderAlmanac(); renderSchedule();
 }
 
+function toggleCropSetting(name) {
+  const fav = favorites.find(f => f.name === name);
+  if (!fav) return;
+  fav.setting = fav.setting === 'outdoor' ? 'indoor' : 'outdoor';
+  
+  // If switching to indoor, remove transplant tasks for this crop
+  if (fav.setting === 'indoor') {
+    savedTasks = savedTasks.filter(t => {
+      if (!t.startsWith(name + '|')) return true;
+      const action = t.split('|')[1];
+      return action !== 'transplant';
+    });
+  }
+  save(); renderAlmanac(); renderSchedule();
+}
+
+function removeCrop(name) {
+  savedTasks = savedTasks.filter(t => !t.startsWith(name + '|'));
+  favorites = favorites.filter(f => f.name !== name);
+  save(); renderAlmanac(); renderSchedule();
+}
+
 function renderSchedule() {
+  const cropsEl = document.getElementById('schedule-crops');
   const timeline = document.getElementById('schedule-timeline');
   const nowEl = document.getElementById('schedule-now');
   const emptyEl = document.getElementById('no-schedule');
   
-  if (!savedTasks.length) {
+  if (!favorites.length) {
+    cropsEl.innerHTML = '';
     timeline.innerHTML = '';
     nowEl.innerHTML = '<p class="text-sm text-green-700">Click colored bars on the 📅 Planting Calendar to pick specific planting windows, or click ⭐ to add all windows for a crop.</p>';
     emptyEl.classList.remove('hidden');
@@ -647,9 +679,28 @@ function renderSchedule() {
   }
   emptyEl.classList.add('hidden');
 
+  // Render crop list with indoor/outdoor toggles
+  cropsEl.innerHTML = `
+    <div class="flex flex-wrap gap-2 mb-2">
+      ${favorites.map(fav => {
+        const plant = ALMANAC.find(p => p.name === fav.name);
+        const emoji = plant ? plant.emoji : '🌱';
+        const isIndoor = fav.setting === 'indoor';
+        return `<div class="inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-full text-xs border ${isIndoor ? 'bg-purple-50 border-purple-200' : 'bg-green-50 border-green-200'}">
+          <span>${emoji} ${fav.name}</span>
+          <button onclick="toggleCropSetting('${fav.name}')" class="px-1.5 py-0.5 rounded-full text-[10px] font-medium transition-colors ${isIndoor ? 'bg-purple-200 text-purple-800 hover:bg-purple-300' : 'bg-green-200 text-green-800 hover:bg-green-300'}" title="Click to switch to ${isIndoor ? 'outdoor' : 'indoor'}">
+            ${isIndoor ? '🏠 Indoor' : '🌤️ Outdoor'}
+          </button>
+          <button onclick="removeCrop('${fav.name}')" class="text-gray-400 hover:text-red-500 px-1" title="Remove">✕</button>
+        </div>`;
+      }).join('')}
+    </div>
+    <p class="text-[10px] text-gray-400">Indoor crops skip transplant tasks. Click the badge to toggle.</p>
+  `;
+
   const currentMonth = new Date().getMonth() + 1;
 
-  // Parse tasks into monthly schedule
+  // Parse tasks into monthly schedule, filtering by indoor/outdoor setting
   const schedule = {};
   for (let m = 1; m <= 12; m++) schedule[m] = [];
 
@@ -658,8 +709,12 @@ function renderSchedule() {
     const m = parseInt(monthStr);
     const plant = ALMANAC.find(p => p.name === name);
     const meta = ACTION_META[action];
+    const fav = favorites.find(f => f.name === name);
+    // Skip transplant for indoor crops
+    if (fav && fav.setting === 'indoor' && action === 'transplant') return;
     if (plant && meta) {
-      schedule[m].push({ plant, action: meta.label, cls: meta.cls, icon: meta.icon, key: taskKey });
+      const isIndoor = fav && fav.setting === 'indoor';
+      schedule[m].push({ plant, action: meta.label, cls: meta.cls, icon: meta.icon, key: taskKey, isIndoor });
     }
   });
 
@@ -700,6 +755,7 @@ function renderSchedule() {
             <div class="flex items-center gap-2 text-sm group">
               <span class="month-bar ${t.cls} inline-block px-2 py-0.5 rounded text-xs">${t.icon} ${t.action}</span>
               <span>${t.plant.emoji} ${t.plant.name}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded ${t.isIndoor ? 'bg-purple-100 text-purple-600' : 'bg-green-100 text-green-600'}">${t.isIndoor ? '🏠' : '🌤️'}</span>
               <button onclick="removeTask('${t.key}')" class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 text-xs transition-opacity" title="Remove">✕</button>
             </div>
           `).join('')}
@@ -713,7 +769,7 @@ function removeTask(key) {
   savedTasks = savedTasks.filter(t => t !== key);
   const name = key.split('|')[0];
   if (!savedTasks.some(t => t.startsWith(name + '|'))) {
-    favorites = favorites.filter(f => f !== name);
+    favorites = favorites.filter(f => f.name !== name);
   }
   save(); renderAlmanac(); renderSchedule();
 }
